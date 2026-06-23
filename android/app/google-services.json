@@ -1,0 +1,46 @@
+{
+  "project_info": {
+    "project_number": "175661209191",
+    "project_id": "cardswap-2722f",
+    "storage_bucket": "cardswap-2722f.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:175661209191:android:ebf75c7968d1833110a6c2",
+        "android_client_info": {
+          "package_name": "com.example.cardswap"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "175661209191-8q3cbmgskh83a3hcbm5q1tvb5g7msupj.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBUR66QRzn0x-unFDRzIVTtMNHZg6OfDFY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "175661209191-8q3cbmgskh83a3hcbm5q1tvb5g7msupj.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "175661209191-6lifmeisca6pu2ud51hk32pj95ghf5h5.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.cardswap"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
