@@ -89,32 +89,6 @@ class HomeDrawer extends StatelessWidget {
                 ),
                 child: Row(
                   children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 8,
-                      ),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF59E0B),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: const Text(
-                        'UA',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-
-                    const SizedBox(width: 20),
-
-                    const Text(
-                      'EN',
-                      style: TextStyle(
-                        color: Colors.white70,
-                      ),
-                    ),
 
                     const Spacer(),
 
