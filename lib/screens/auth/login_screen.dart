@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
-
-import '../../services/auth_service.dart';
 import 'forgot_password_screen.dart';
 import 'register_screen.dart';
 import '../home/home_screen.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import '../../repositories/auth_repository.dart';
+import '../../services/notification_service.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -17,7 +18,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final passwordController = TextEditingController();
   bool _obscurePassword = true;
 
-  final authService = AuthService();
+  final AuthRepository repository = AuthRepository();
 
   bool isLoading = false;
 
@@ -25,10 +26,22 @@ class _LoginScreenState extends State<LoginScreen> {
     try {
       setState(() => isLoading = true);
 
-      await authService.login(
-        email: emailController.text.trim(),
-        password: passwordController.text.trim(),
+      final email = emailController.text.trim();
+      final password = passwordController.text;
+
+      debugPrint('LOGIN EMAIL: $email');
+      debugPrint('LOGIN PASSWORD LENGTH: ${password.length}');
+
+      await repository.login(
+        email: email,
+        password: password,
       );
+
+      debugPrint('FIREBASE LOGIN SUCCESS');
+
+      await NotificationService.instance.saveTokenForCurrentUser();
+
+      debugPrint('FCM TOKEN SAVED');
 
       if (!mounted) return;
 
@@ -38,14 +51,34 @@ class _LoginScreenState extends State<LoginScreen> {
           builder: (_) => const HomeScreen(),
         ),
       );
+    } on FirebaseAuthException catch (e) {
+      debugPrint('FIREBASE AUTH ERROR');
+      debugPrint('CODE: ${e.code}');
+      debugPrint('MESSAGE: ${e.message}');
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Firebase: ${e.code}\n${e.message ?? ''}',
+          ),
+        ),
+      );
     } catch (e) {
+      debugPrint('OTHER LOGIN ERROR: $e');
+
+      if (!mounted) return;
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(e.toString()),
         ),
       );
     } finally {
-      setState(() => isLoading = false);
+      if (mounted) {
+        setState(() => isLoading = false);
+      }
     }
   }
 

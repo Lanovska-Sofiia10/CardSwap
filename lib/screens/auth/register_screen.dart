@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
-
-import '../../services/auth_service.dart';
+import '../../repositories/auth_repository.dart';
+import '../home/create_card_screen.dart';
+import '../../services/notification_service.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -14,7 +15,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final passwordController = TextEditingController();
   bool _obscurePassword = true;
 
-  final authService = AuthService();
+  final AuthRepository repository = AuthRepository();
 
   bool isLoading = false;
 
@@ -22,20 +23,21 @@ class _RegisterScreenState extends State<RegisterScreen> {
     try {
       setState(() => isLoading = true);
 
-      await authService.register(
+      await repository.register(
         email: emailController.text.trim(),
         password: passwordController.text.trim(),
       );
 
+      await NotificationService.instance.saveTokenForCurrentUser();
+
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Акаунт створено'),
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (_) => const CreateCardScreen(),
         ),
       );
-
-      Navigator.pop(context);
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(

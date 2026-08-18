@@ -68,10 +68,39 @@ class CardModel {
       photoUrl: json['photoUrl'] ?? '',
       about: json['about'] ?? '',
 
-      cardColor: json['cardColor'] ?? 0xFFF59E0B,
+      cardColor: json['cardColor'] is int
+          ? json['cardColor']
+          : int.tryParse(json['cardColor'].toString()) ?? 0xFFF59E0B,
 
       ownerId: json['ownerId'] ?? '',
-      showInCatalog: json['showInCatalog'] ?? true,
+      showInCatalog: json['showInCatalog'] is bool
+          ? json['showInCatalog']
+          : json['showInCatalog'].toString().toLowerCase() == 'true',
     );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'ownerId': ownerId,
+
+      'fullName': fullName,
+      'position': position,
+      'company': company,
+
+      'phone': phone,
+      'email': email,
+      'website': website,
+
+      'linkedin': linkedin,
+      'telegram': telegram,
+      'instagram': instagram,
+      'github': github,
+
+      'photoUrl': photoUrl,
+      'about': about,
+
+      'cardColor': cardColor,
+      'showInCatalog': showInCatalog,
+    };
   }
 }

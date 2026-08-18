@@ -1,13 +1,15 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../models/card_model.dart';
 import '../../widgets/catalog_card_widget.dart';
-import 'contacts_screen.dart';
-import 'package:qr_flutter/qr_flutter.dart';
 import 'home_screen.dart';
 import 'scan_qr_screen.dart';
 import 'dart:async';
+import '../../repositories/card_repository.dart';
+import '../../widgets/qr_dialog.dart';
+import '../../widgets/card_picker_bottom_sheet.dart';
+import '../../repositories/exchange_api_repository.dart';
+import '../../services/notification_service.dart';
+import 'package:sensors_plus/sensors_plus.dart';
 
 class ExchangeScreen extends StatefulWidget {
   const ExchangeScreen({super.key});
@@ -25,217 +27,148 @@ class _ExchangeScreenState
   List<CardModel> cards = [];
 
   CardModel? selectedCard;
-  int _contactsCountBeforeExchange = 0;
+
+  bool _isQrDialogOpen = false;
+
+  bool _sending = false;
+
+  final CardRepository _repository =
+  CardRepository();
+
+
+  final ExchangeApiRepository _exchangeApiRepository =
+  ExchangeApiRepository();
+
+  StreamSubscription<AccelerometerEvent>? _accelerometerSubscription;
+
+  DateTime _lastShakeTime =
+  DateTime.fromMillisecondsSinceEpoch(0);
+
 
   @override
   void initState() {
     super.initState();
+
     loadCards();
+    _startAccelerometerListener();
   }
 
   Future<void> loadCards() async {
-
-    final user =
-        FirebaseAuth.instance.currentUser;
-
-    if (user == null) {
-      setState(() {
-        isLoading = false;
-      });
-      return;
-    }
-
-    final snapshot =
-    await FirebaseFirestore.instance
-        .collection('cards')
-        .where(
-      'ownerId',
-      isEqualTo: user.uid,
-    )
-        .get();
-
-    cards = snapshot.docs
-        .map(
-          (doc) => CardModel.fromJson(
-        doc.data(),
-        doc.id,
-      ),
-    )
-        .toList();
+    cards = await _repository.getMyCards();
 
     if (cards.isNotEmpty) {
       selectedCard = cards.first;
     }
+
+    if (!mounted) return;
 
     setState(() {
       isLoading = false;
     });
   }
 
+  void _startAccelerometerListener() {
+    _accelerometerSubscription =
+        accelerometerEventStream().listen((event) {
+
+          final now = DateTime.now();
+
+          // Захист від багаторазового спрацювання
+          if (now.difference(_lastShakeTime).inSeconds < 2) {
+            return;
+          }
+
+          const double threshold = 18;
+
+          if (event.x.abs() > threshold) {
+            _lastShakeTime = now;
+
+            _startExchange();
+          }
+        });
+  }
+
+  void _onExchangeSuccess() {
+
+    if (!mounted) return;
+
+    if (_isQrDialogOpen) {
+      Navigator.of(context, rootNavigator: true).pop();
+      _isQrDialogOpen = false;
+    }
+
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const HomeScreen(
+          initialIndex: 3,
+        ),
+      ),
+          (_) => false,
+    );
+  }
 
   Future<void> _showQrDialog(CardModel card) async {
 
-    final user = FirebaseAuth.instance.currentUser;
+    _isQrDialogOpen = true;
 
-    if (user != null) {
-      final snapshot = await FirebaseFirestore.instance
-          .collection('contacts')
-          .where('ownerUserId', isEqualTo: user.uid)
-          .get();
-
-      _contactsCountBeforeExchange = snapshot.docs.length;
-    }
-
-    showDialog(
-      context: context,
-      barrierDismissible: true,
-      builder: (dialogContext) {
-        return Dialog(
-          backgroundColor: Colors.transparent,
-          child: Container(
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(28),
-              boxShadow: const [
-                BoxShadow(
-                  color: Color(0x1AF59E0B),
-                  blurRadius: 25,
-                  spreadRadius: 5,
-                ),
-              ],
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 70,
-                  height: 70,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF59E0B),
-                    borderRadius: BorderRadius.circular(18),
-                  ),
-                  child: const Icon(
-                    Icons.qr_code_2,
-                    color: Colors.white,
-                    size: 36,
-                  ),
-                ),
-
-                const SizedBox(height: 20),
-
-                const Text(
-                  'Покажіть QR-код',
-                  style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-
-                const SizedBox(height: 8),
-
-                const Text(
-                  'Інша людина може відсканувати код та миттєво отримати вашу візитку',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: Colors.grey,
-                    fontSize: 15,
-                  ),
-                ),
-
-                const SizedBox(height: 24),
-
-                Container(
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                      color: const Color(0xFFF59E0B),
-                      width: 2,
-                    ),
-                  ),
-                  child: QrImageView(
-                    data: card.id,
-                    size: 220,
-                  ),
-                ),
-
-                const SizedBox(height: 20),
-
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 12,
-                  ),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFFF7E6),
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: const Row(
-                    children: [
-                      Icon(
-                        Icons.flash_on,
-                        color: Color(0xFFF59E0B),
-                      ),
-                      SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          'Контакт буде додано автоматично після сканування',
-                          style: TextStyle(
-                            fontSize: 13,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );      },
+    NotificationService.instance.addExchangeListener(
+      _onExchangeSuccess,
     );
 
-    _exchangeSubscription?.cancel();
+    await showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (_) => QrDialog(
+        card: card,
+      ),
+    );
 
-    _listenForExchange(card.id);
+    NotificationService.instance.removeExchangeListener(
+      _onExchangeSuccess,
+    );
+
+    _isQrDialogOpen = false;
   }
 
-  StreamSubscription? _exchangeSubscription;
+  Future<void> _startExchange() async {
+    if (selectedCard == null || _sending) {
+      return;
+    }
 
-  void _listenForExchange(String cardId) {
-    final user = FirebaseAuth.instance.currentUser;
-
-    if (user == null) return;
-
-    _exchangeSubscription?.cancel();
-
-    _exchangeSubscription = FirebaseFirestore.instance
-        .collection('contacts')
-        .where('ownerUserId', isEqualTo: user.uid)
-        .snapshots()
-        .listen((snapshot) {
-
-      if (snapshot.docs.length > _contactsCountBeforeExchange) {
-
-        _exchangeSubscription?.cancel();
-
-        if (!mounted) return;
-
-        Navigator.pop(context);
-
-        Navigator.pushAndRemoveUntil(
-          context,
-          MaterialPageRoute(
-            builder: (_) => const HomeScreen(
-              initialIndex: 3,
-            ),
-          ),
-              (route) => false,
-        );
-      }
+    setState(() {
+      _sending = true;
     });
+
+    try {
+      await _exchangeApiRepository.sendExchange(
+        cardId: selectedCard!.id,
+      );
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Запит на обмін відправлено"),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.toString()),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _sending = false;
+        });
+      }
+    }
   }
+
   void _showCardPicker() {
     showModalBottomSheet(
       context: context,
@@ -245,82 +178,21 @@ class _ExchangeScreenState
           top: Radius.circular(24),
         ),
       ),
-      builder: (context) {
-        return SafeArea(
-            child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: SizedBox(
-                  height: cards.length > 3 ? 500 : null,
-                  child: ListView(
-                    shrinkWrap: true,
-                    children: [
-                      const Text(
-                        'Оберіть візитку',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-
-                      const SizedBox(height: 16),
-
-                      ...cards.map((card) {
-                        return GestureDetector(
-                          onTap: () {
-                            setState(() {
-                              selectedCard = card;
-                            });
-
-                            Navigator.pop(context);
-                          },
-                          child: Stack(
-                            children: [
-                              Padding(
-                                padding: const EdgeInsets.only(bottom: 12),
-                                child: CatalogCardWidget(card: card),
-                              ),
-
-                              if (selectedCard?.id == card.id)
-                                Positioned(
-                                  top: 8,
-                                  right: 8,
-                                  child: Container(
-                                    width: 22,
-                                    height: 22,
-                                    decoration: BoxDecoration(
-                                      color: Colors.white,
-                                      shape: BoxShape.circle,
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: Colors.black12,
-                                          blurRadius: 4,
-                                          spreadRadius: 1,
-                                        ),
-                                      ],
-                                    ),
-                                    child: const Icon(
-                                      Icons.check,
-                                      size: 16,
-                                      color: Colors.black,
-                                    ),
-                                  ),
-                                ),
-                            ],
-                          ),
-                        );                      }),
-                    ],
-                  ),
-                ),
-            ),
-        );
-      },
+      builder: (_) => CardPickerBottomSheet(
+        cards: cards,
+        selectedCard: selectedCard,
+        onSelected: (card) {
+          setState(() {
+            selectedCard = card;
+          });
+        },
+      ),
     );
   }
 
   @override
   void dispose() {
-    _exchangeSubscription?.cancel();
+    _accelerometerSubscription?.cancel();
     super.dispose();
   }
 
@@ -442,7 +314,7 @@ class _ExchangeScreenState
               width: 180,
               height: 48,
               child: ElevatedButton.icon(
-                onPressed: () {},
+                onPressed: _sending ? null : _startExchange,
                 icon: const Icon(Icons.bolt),
                 label: const Text('Почати обмін'),
                 style: ElevatedButton.styleFrom(
@@ -456,7 +328,7 @@ class _ExchangeScreenState
             ),
           ),
 
-          const SizedBox(height: 90),
+          const Spacer(),
 
           // My Card Header
           Row(
@@ -484,8 +356,6 @@ class _ExchangeScreenState
           ),
 
           const SizedBox(height: 12),
-
-          // Тут буде твій CatalogCardWidget
         if (selectedCard != null)
             CatalogCardWidget(
               card: selectedCard!,

@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'home_screen.dart';
+import '../../repositories/scan_qr_repository.dart';
+import '../../services/notification_service.dart';
 
 class ScanQrScreen extends StatefulWidget {
   final String myCardId;
@@ -18,9 +18,34 @@ class ScanQrScreen extends StatefulWidget {
 
 class _ScanQrScreenState extends State<ScanQrScreen> {
   bool _isScanned = false;
+  final ScanQrRepository _repository =
+  ScanQrRepository();
 
   static const double frameSize = 260;
   static const double frameOffsetY = -40;
+
+  @override
+  void initState() {
+    super.initState();
+
+    NotificationService.instance.addExchangeListener(
+      _onExchangeSuccess,
+    );
+  }
+
+  void _onExchangeSuccess() {
+    if (!mounted) return;
+
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const HomeScreen(
+          initialIndex: 3,
+        ),
+      ),
+          (_) => false,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -29,13 +54,16 @@ class _ScanQrScreenState extends State<ScanQrScreen> {
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
+        backgroundColor: const Color(0xFF0F172A),
         elevation: 0,
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
         centerTitle: true,
+        iconTheme: const IconThemeData(
+          color: Colors.white,
+        ),
         title: const Text(
           'Сканування QR',
           style: TextStyle(
+            color: Colors.white,
             fontWeight: FontWeight.bold,
           ),
         ),
@@ -62,7 +90,7 @@ class _ScanQrScreenState extends State<ScanQrScreen> {
 
               _isScanned = true;
 
-              print("SCANNED ID: $cardId");
+              debugPrint("SCANNED ID: $cardId");
 
               _handleScan(cardId);
             },
@@ -143,64 +171,31 @@ class _ScanQrScreenState extends State<ScanQrScreen> {
     );
   }
 
+  @override
+  void dispose() {
+    NotificationService.instance.removeExchangeListener(
+      _onExchangeSuccess,
+    );
+    super.dispose();
+  }
+
   Future<void> _handleScan(String cardId) async {
     try {
-      final currentUser = FirebaseAuth.instance.currentUser;
-      if (currentUser == null) return;
+      debugPrint("START EXCHANGE");
+      debugPrint("My card: ${widget.myCardId}");
+      debugPrint("Target: $cardId");
 
-      final cardDoc = await FirebaseFirestore.instance
-          .collection('cards')
-          .doc(cardId)
-          .get();
-
-      if (!cardDoc.exists) {
-        throw Exception('Візитку не знайдено');
-      }
-
-      final scannedCard = cardDoc.data()!;
-
-      final scannedUserId = scannedCard['ownerId'];
-
-      final myCardId = widget.myCardId; // або активна картка
-
-      final contactsRef = FirebaseFirestore.instance.collection('contacts');
-
-      // 🔥 1. запис для мене
-      await contactsRef.add({
-        'ownerUserId': currentUser.uid,
-        'ownerCardId': myCardId,
-        'contactUserId': scannedUserId,
-        'contactCardId': cardId,
-        'createdAt': DateTime.now().toIso8601String(),
-      });
-
-      // 🔥 2. зворотній запис (щоб у нього теж з'явилось)
-      await contactsRef.add({
-        'ownerUserId': scannedUserId,
-        'ownerCardId': cardId,
-        'contactUserId': currentUser.uid,
-        'contactCardId': myCardId,
-        'createdAt': DateTime.now().toIso8601String(),
-      });
-
-      if (!mounted) return;
-
-      Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(
-          builder: (_) => const HomeScreen(
-            initialIndex: 3,
-          ),
-        ),
-            (route) => false,
+      await _repository.exchangeCards(
+        scannedCardId: cardId,
+        myCardId: widget.myCardId,
       );
 
+      debugPrint("REQUEST FINISHED");
     } catch (e) {
-      print("ERROR: $e");
+      debugPrint("ERROR: $e");
       _isScanned = false;
     }
-  }
-}
+  }}
 
 class ScannerOverlayPainter extends CustomPainter {
   final double frameSize;

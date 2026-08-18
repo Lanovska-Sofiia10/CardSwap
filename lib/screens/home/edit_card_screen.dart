@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:io';
 import 'package:image_picker/image_picker.dart';
 import '../../models/card_model.dart';
-import 'package:firebase_storage/firebase_storage.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import '../../repositories/card_repository.dart';
+import '../../widgets/card_text_field.dart';
+import '../../widgets/color_circle.dart';
 
 class EditCardScreen extends StatefulWidget {
   final CardModel card;
@@ -34,8 +34,21 @@ class _EditCardScreenState extends State<EditCardScreen> {
 
   late Color selectedColor;
 
+  final List<Color> cardColors = const [
+    Color(0xFFF59E0B),
+    Color(0xFF60A5FA),
+    Color(0xFF34D399),
+    Color(0xFFA78BFA),
+    Color(0xFFFB7185),
+    Color(0xFF22D3EE),
+  ];
+
   bool showInCatalog = true;
+
+  bool _isSaving = false;
   File? selectedImage;
+  final CardRepository _repository =
+  CardRepository();
 
   @override
   void initState() {
@@ -110,76 +123,37 @@ class _EditCardScreenState extends State<EditCardScreen> {
     }
   }
 
-  Future<String?> uploadPhoto() async {
-    if (selectedImage == null) {
-      print('NO IMAGE SELECTED');
-      return null;
-    }
-    print('USER: ${FirebaseAuth.instance.currentUser}');
-    try {
-      print('START UPLOAD: ${selectedImage!.path}');
-
-      final ref = FirebaseStorage.instance
-          .ref()
-          .child('profile_photos/${widget.card.id}.jpg');
-
-      final task = ref.putFile(selectedImage!);
-
-      final snapshot = await task;
-      print(selectedImage!.path);
-      print(selectedImage!.existsSync());
-      if (snapshot.state != TaskState.success) {
-        print('UPLOAD FAILED');
-        return null;
-      }
-
-
-      final url = await ref.getDownloadURL();
-
-      print('DOWNLOAD URL: $url');
-
-      return url;
-    } catch (e, stack) {
-      print('UPLOAD ERROR: $e');
-      print(stack);
-      return null;
-    }
-  }
   Future<void> updateCard() async {
+    final card = CardModel(
+      id: widget.card.id,
+      ownerId: widget.card.ownerId,
 
-    String? photoUrl;
+      fullName: fullNameController.text.trim(),
+      position: positionController.text.trim(),
+      company: companyController.text.trim(),
 
-    if (selectedImage != null) {
-      photoUrl = await uploadPhoto();
-    }
+      phone: phoneController.text.trim(),
+      email: emailController.text.trim(),
+      website: websiteController.text.trim(),
 
-    await FirebaseFirestore.instance
-        .collection('cards')
-        .doc(widget.card.id)
-        .update({
+      linkedin: linkedinController.text.trim(),
+      telegram: telegramController.text.trim(),
+      instagram: instagramController.text.trim(),
+      github: githubController.text.trim(),
 
-      'fullName': fullNameController.text,
-      'position': positionController.text,
-      'company': companyController.text,
+      about: aboutController.text.trim(),
 
-      'phone': phoneController.text,
-      'email': emailController.text,
-      'website': websiteController.text,
+      photoUrl: widget.card.photoUrl,
 
-      'linkedin': linkedinController.text,
-      'telegram': telegramController.text,
-      'instagram': instagramController.text,
-      'github': githubController.text,
+      cardColor: selectedColor.value,
+      showInCatalog: showInCatalog,
+    );
 
-      'about': aboutController.text,
-
-      'cardColor': selectedColor.value,
-
-      'showInCatalog': showInCatalog,
-
-      if (photoUrl != null)
-        'photoUrl': photoUrl,
-    });
+    await _repository.updateCard(
+      widget.card.id,
+      card,
+      selectedImage,
+    );
   }
   @override
   Widget build(BuildContext context) {
@@ -232,21 +206,23 @@ class _EditCardScreenState extends State<EditCardScreen> {
               Center(
                 child: Stack(
                   children: [
-                    CircleAvatar(
-                      radius: 45,
-                      backgroundColor: Colors.grey.shade200,
-                      backgroundImage:
-                      selectedImage != null
-                          ? FileImage(selectedImage!)
-                          : null,
-                      child: selectedImage == null
-                          ? const Icon(
-                        Icons.person,
-                        size: 45,
-                        color: Colors.grey,
-                      )
-                          : null,
-                    ),
+                  CircleAvatar(
+                  radius: 45,
+                  backgroundColor: Colors.grey.shade200,
+                  backgroundImage: selectedImage != null
+                      ? FileImage(selectedImage!)
+                      : (widget.card.photoUrl.isNotEmpty
+                      ? NetworkImage(widget.card.photoUrl)
+                      : null) as ImageProvider?,
+                  child: selectedImage == null &&
+                      widget.card.photoUrl.isEmpty
+                      ? const Icon(
+                    Icons.person,
+                    size: 45,
+                    color: Colors.grey,
+                  )
+                      : null,
+                ),
 
                     Positioned(
                       right: 0,
@@ -272,16 +248,55 @@ class _EditCardScreenState extends State<EditCardScreen> {
 
               const SizedBox(height: 30),
 
-              _field('Повне ім\'я', fullNameController),
-              _field('Посада', positionController),
-              _field('Компанія', companyController),
-              _field('Електронна пошта', emailController),
-              _field('Телефон', phoneController),
-              _field('Вебсайт', websiteController),
-              _field('LinkedIn', linkedinController),
-              _field('Telegram', telegramController),
-              _field('Instagram', instagramController),
-              _field('GitHub', githubController),
+              CardTextField(
+                label: 'Повне ім\'я',
+                controller: fullNameController,
+              ),
+
+              CardTextField(
+                label: 'Посада',
+                controller: positionController,
+              ),
+
+              CardTextField(
+                label: 'Компанія',
+                controller: companyController,
+              ),
+
+              CardTextField(
+                label: 'Електронна пошта',
+                controller: emailController,
+              ),
+
+              CardTextField(
+                label: 'Телефон',
+                controller: phoneController,
+              ),
+
+              CardTextField(
+                label: 'Вебсайт',
+                controller: websiteController,
+              ),
+
+              CardTextField(
+                label: 'LinkedIn',
+                controller: linkedinController,
+              ),
+
+              CardTextField(
+                label: 'Telegram',
+                controller: telegramController,
+              ),
+
+              CardTextField(
+                label: 'Instagram',
+                controller: instagramController,
+              ),
+
+              CardTextField(
+                label: 'GitHub',
+                controller: githubController,
+              ),
 
               const SizedBox(height: 8),
 
@@ -319,16 +334,32 @@ class _EditCardScreenState extends State<EditCardScreen> {
 
               const SizedBox(height: 12),
 
-              Row(
-                children: [
-                  _color(const Color(0xFFF59E0B)),
-                  _color(const Color(0xFF60A5FA)),
-                  _color(const Color(0xFF34D399)),
-                  _color(const Color(0xFFA78BFA)),
-                  _color(const Color(0xFFFB7185)),
-                  _color(const Color(0xFF22D3EE)),
-                ],
+            GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: cardColors.length,
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 6, // рівно 6 кольорів у рядку
+                crossAxisSpacing: 10,
+                mainAxisSpacing: 10,
+                childAspectRatio: 1,
               ),
+              itemBuilder: (context, index) {
+                final color = cardColors[index];
+
+                return Center(
+                  child: ColorCircle(
+                    color: color,
+                    selected: selectedColor == color,
+                    onTap: () {
+                      setState(() {
+                        selectedColor = color;
+                      });
+                    },
+                  ),
+                );
+              },
+            ),
 
               const SizedBox(height: 24),
 
@@ -375,7 +406,9 @@ class _EditCardScreenState extends State<EditCardScreen> {
 
                   Expanded(
                     child: OutlinedButton(
-                      onPressed: () {
+                      onPressed: _isSaving
+                          ? null
+                          : () {
                         Navigator.pop(context);
                       },
 
@@ -400,23 +433,40 @@ class _EditCardScreenState extends State<EditCardScreen> {
 
                   Expanded(
                     child: ElevatedButton(
-                      onPressed: () async {
-                        try {
-                          await updateCard();
+                        onPressed: _isSaving
+                            ? null
+                            : () async {
 
-                          if (!mounted) return;
+                          if (_isSaving) return;
 
-                          Navigator.of(context).pop(true);
-                        } catch (e) {
-                          print('ERROR: $e');
+                          setState(() {
+                            _isSaving = true;
+                          });
 
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(e.toString()),
-                            ),
-                          );
-                        }
-                      },
+                          try {
+                            await updateCard();
+
+                            if (!mounted) return;
+
+                            Navigator.of(context).pop(true);
+
+                          } catch (e) {
+
+                            if (mounted) {
+                              setState(() {
+                                _isSaving = false;
+                              });
+                            }
+
+                            print('ERROR: $e');
+
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(e.toString()),
+                              ),
+                            );
+                          }
+                        },
 
                       style: ElevatedButton.styleFrom(
                         backgroundColor:
@@ -434,86 +484,22 @@ class _EditCardScreenState extends State<EditCardScreen> {
                         ),
                       ),
 
-                      child: const Text(
-                        'Зберегти',
-                      ),
+                      child: _isSaving
+                          ? const SizedBox(
+                        width: 22,
+                        height: 22,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2.5,
+                          color: Colors.white,
+                        ),
+                      )
+                          : const Text('Зберегти'),
                     ),
                   ),
                 ],
               ),
             ],
           ),
-        ),
-      ),
-    );
-  }
-
-  Widget _field(
-      String label,
-      TextEditingController controller,
-      ) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
-
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-
-          Text(
-            label,
-            style: const TextStyle(
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-
-          const SizedBox(height: 8),
-
-          TextField(
-            controller: controller,
-
-            decoration: InputDecoration(
-              filled: true,
-              fillColor: Colors.grey.shade50,
-
-              border: OutlineInputBorder(
-                borderRadius:
-                BorderRadius.circular(16),
-
-                borderSide: BorderSide.none,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _color(Color color) {
-    final selected = selectedColor == color;
-
-    return GestureDetector(
-      onTap: () {
-        setState(() {
-          selectedColor = color;
-        });
-      },
-
-      child: Container(
-        margin: const EdgeInsets.only(right: 10),
-
-        width: 36,
-        height: 36,
-
-        decoration: BoxDecoration(
-          color: color,
-          shape: BoxShape.circle,
-
-          border: selected
-              ? Border.all(
-            color: Colors.black,
-            width: 2,
-          )
-              : null,
         ),
       ),
     );

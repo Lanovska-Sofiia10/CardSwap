@@ -1,1 +1,42 @@
-{"flutter":{"platforms":{"android":{"default":{"projectId":"cardswap-2722f","appId":"1:175661209191:android:ebf75c7968d1833110a6c2","fileOutput":"android/app/google-services.json"}},"dart":{"lib/firebase_options.dart":{"projectId":"cardswap-2722f","configurations":{"android":"1:175661209191:android:ebf75c7968d1833110a6c2","ios":"1:175661209191:ios:60f9f76bc10e0c0d10a6c2","macos":"1:175661209191:ios:60f9f76bc10e0c0d10a6c2","web":"1:175661209191:web:c4c813dd3c86d3b610a6c2","windows":"1:175661209191:web:a041a1d4cd8aecc310a6c2"}}}}}}
+{
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "cardswap-2722f",
+          "appId": "1:175661209191:android:ebf75c7968d1833110a6c2",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "cardswap-2722f",
+          "configurations": {
+            "android": "1:175661209191:android:ebf75c7968d1833110a6c2",
+            "ios": "1:175661209191:ios:60f9f76bc10e0c0d10a6c2",
+            "macos": "1:175661209191:ios:60f9f76bc10e0c0d10a6c2",
+            "web": "1:175661209191:web:c4c813dd3c86d3b610a6c2",
+            "windows": "1:175661209191:web:a041a1d4cd8aecc310a6c2"
+          }
+        }
+      }
+    }
+  },
+  "functions": [
+    {
+      "source": "functions",
+      "codebase": "default",
+      "disallowLegacyRuntimeConfig": true,
+      "ignore": [
+        "node_modules",
+        ".git",
+        "firebase-debug.log",
+        "firebase-debug.*.log",
+        "*.local"
+      ],
+      "predeploy": [
+        "npm --prefix \"$RESOURCE_DIR\" run build"
+      ]
+    }
+  ]
+}

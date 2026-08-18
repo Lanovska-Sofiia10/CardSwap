@@ -1,29 +1,41 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'dart:convert';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:http/http.dart' as http;
+import 'backend_service.dart';
 
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  Future<UserCredential> register({
+  Future<void> register({
     required String email,
     required String password,
   }) async {
-    final credential = await _auth.createUserWithEmailAndPassword(
+    final response = await http.post(
+      Uri.parse('${BackendService.baseUrl}/auth/register'),
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode({
+        'email': email,
+        'password': password,
+      }),
+    );
+
+    final data = jsonDecode(response.body);
+
+    if (response.statusCode != 201) {
+      final message =
+      data['errors'] != null
+          ? data['errors'][0]['msg']
+          : data['message'] ?? 'Помилка реєстрації';
+
+      throw Exception(message);
+    }
+
+    await _auth.signInWithEmailAndPassword(
       email: email,
       password: password,
     );
-
-    await _firestore
-        .collection('users')
-        .doc(credential.user!.uid)
-        .set({
-      'email': email,
-      'createdAt': Timestamp.now(),
-      'hasCard': false,
-    });
-
-    return credential;
   }
 
   Future<UserCredential> login({
@@ -37,7 +49,9 @@ class AuthService {
   }
 
   Future<void> resetPassword(String email) async {
-    await _auth.sendPasswordResetEmail(email: email);
+    await _auth.sendPasswordResetEmail(
+      email: email,
+    );
   }
 
   Future<void> logout() async {

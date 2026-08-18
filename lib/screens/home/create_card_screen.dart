@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import '../../models/card_model.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:io';
 import 'package:image_picker/image_picker.dart';
+import '../../models/card_model.dart';
+import 'home_screen.dart';
+import '../../repositories/card_repository.dart';
 
 class CreateCardScreen extends StatefulWidget {
   const CreateCardScreen({super.key});
@@ -25,10 +25,12 @@ class _CreateCardScreenState extends State<CreateCardScreen> {
   final githubController = TextEditingController();
   final aboutController = TextEditingController();
 
+  bool _isSaving = false;
+
   Color selectedColor = const Color(0xFFF59E0B);
   bool showInCatalog = true;
   File? selectedImage;
-
+  final CardRepository repository = CardRepository();
 
   Future<void> pickImage() async {
     final picker = ImagePicker();
@@ -44,48 +46,6 @@ class _CreateCardScreenState extends State<CreateCardScreen> {
     }
   }
 
-  Future<void> saveCard() async {
-    final user = FirebaseAuth.instance.currentUser;
-
-    if (user == null) return;
-
-    await FirebaseFirestore.instance
-        .collection('cards')
-        .doc(user.uid)
-        .set({
-      'ownerId': user.uid,
-
-      'fullName': fullNameController.text,
-      'position': positionController.text,
-      'company': companyController.text,
-
-      'phone': phoneController.text,
-      'email': emailController.text,
-      'website': websiteController.text,
-
-      'linkedin': linkedinController.text,
-      'telegram': telegramController.text,
-      'instagram': instagramController.text,
-      'github': githubController.text,
-
-      'about': aboutController.text,
-
-      'photoUrl': '',
-
-      'cardColor': selectedColor.value,
-
-      'showInCatalog': showInCatalog,
-
-      'createdAt': FieldValue.serverTimestamp(),
-    });
-
-    await FirebaseFirestore.instance
-        .collection('users')
-        .doc(user.uid)
-        .update({
-      'hasCard': true,
-    });
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -339,14 +299,64 @@ class _CreateCardScreenState extends State<CreateCardScreen> {
 
                   Expanded(
                     child: ElevatedButton(
-                      onPressed: () async {
+                        onPressed: _isSaving
+                            ? null
+                            : () async {
 
-                        await saveCard();
+                          if (_isSaving) return;
 
-                        if (!mounted) return;
+                          setState(() {
+                            _isSaving = true;
+                          });
 
-                        Navigator.pop(context, true);
-                      },
+                          final card = CardModel(
+                            id: '',
+                            ownerId: '',
+                            fullName: fullNameController.text.trim(),
+                            position: positionController.text.trim(),
+                            company: companyController.text.trim(),
+                            phone: phoneController.text.trim(),
+                            email: emailController.text.trim(),
+                            website: websiteController.text.trim(),
+                            linkedin: linkedinController.text.trim(),
+                            telegram: telegramController.text.trim(),
+                            instagram: instagramController.text.trim(),
+                            github: githubController.text.trim(),
+                            about: aboutController.text.trim(),
+                            photoUrl: '',
+                            cardColor: selectedColor.value,
+                            showInCatalog: showInCatalog,
+                          );
+
+                          try {
+                            await repository.createCard(
+                              card,
+                              selectedImage,
+                            );
+
+                            if (!mounted) return;
+
+                            Navigator.pushAndRemoveUntil(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const HomeScreen(),
+                              ),
+                                  (_) => false,
+                            );
+                          } catch (e) {
+                            if (mounted) {
+                              setState(() {
+                                _isSaving = false;
+                              });
+
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(e.toString()),
+                                ),
+                              );
+                            }
+                          }
+                        },
                       style:
                       ElevatedButton.styleFrom(
                         backgroundColor:
@@ -362,9 +372,16 @@ class _CreateCardScreenState extends State<CreateCardScreen> {
                               16),
                         ),
                       ),
-                      child: const Text(
-                        'Зберегти',
-                      ),
+                      child: _isSaving
+                          ? const SizedBox(
+                        width: 22,
+                        height: 22,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2.5,
+                          color: Colors.white,
+                        ),
+                      )
+                          : const Text('Зберегти'),
                     ),
                   ),
                 ],

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
-
-import '../../services/auth_service.dart';
+import '../../repositories/auth_repository.dart';
 
 class ForgotPasswordScreen extends StatefulWidget {
   const ForgotPasswordScreen({super.key});
@@ -14,11 +13,12 @@ class _ForgotPasswordScreenState
     extends State<ForgotPasswordScreen> {
   final emailController = TextEditingController();
 
-  final authService = AuthService();
+  final AuthRepository repository =
+  AuthRepository();
 
   Future<void> resetPassword() async {
     try {
-      await authService.resetPassword(
+      await repository.resetPassword(
         emailController.text.trim(),
       );
 
@@ -45,6 +45,7 @@ class _ForgotPasswordScreenState
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xfff8fafc),
       appBar: AppBar(
         title: const Text('Відновлення пароля'),
       ),

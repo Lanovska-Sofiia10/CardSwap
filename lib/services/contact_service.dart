@@ -9,7 +9,11 @@ class ContactService {
   Future<void> createContact({
     required ContactModel contact,
   }) async {
-    await _contacts.add(
+    await _contacts
+        .doc(
+      "${contact.ownerCardId}_${contact.contactCardId}",
+    )
+        .set(
       contact.toJson(),
     );
   }
