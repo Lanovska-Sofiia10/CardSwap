@@ -1,0 +1,45 @@
+name: Build iOS App
+
+on:
+push:
+branches: [ main, master ]
+workflow_dispatch:
+
+jobs:
+build:
+runs-on: macos-latest
+
+steps:
+- name: Checkout code
+uses: actions/checkout@v4
+
+- name: Set up Java (for Flutter)
+uses: actions/setup-java@v4
+with:
+distribution: 'zulu'
+java-version: '17'
+
+- name: Set up Flutter
+uses: subosito/flutter-action@v2
+with:
+channel: 'stable'
+cache: true
+
+- name: Install dependencies
+run: flutter pub get
+
+- name: Build iOS (No codesign)
+run: flutter build ios --release --no-codesign
+
+- name: Compress iOS payload
+run: |
+cd build/ios/iphoneos
+mkdir Payload
+mv Runner.app Payload/
+zip -r CardSwap.ipa Payload
+
+- name: Upload iOS IPA Artifact
+uses: actions/upload-artifact@v4
+with:
+name: ios-build-ipa
+path: build/ios/iphoneos/CardSwap.ipa
