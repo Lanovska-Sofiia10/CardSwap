@@ -28,13 +28,11 @@ jobs:
     - name: Install dependencies
       run: flutter pub get
 
-    - name: Update CocoaPods Repo
-      run: |
-        cd ios
-        pod repo update
-
     - name: Build iOS (No codesign)
-      run: flutter build ios --release --no-codesign
+      run: |
+        flutter build ios --release --no-codesign --extra-front-end-options=--no-implicit-dynamic --build-number=1
+      env:
+        FLUTTER_XCODE_BUILD_SETTINGS: "GCC_WARN_INHIBIT_ALL_WARNINGS=YES"
 
     - name: Compress iOS payload
       run: |
