@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
+
 import '../repositories/home_repository.dart';
 import '../screens/auth/login_screen.dart';
-import '../screens/home/settings_screen.dart';
+import '../screens/home/settings_screen.dart' hide ProfileScreen;
 import '../screens/profile/profile_screen.dart';
 import 'logout_dialog.dart';
 
@@ -13,9 +14,17 @@ class HomeDrawer extends StatelessWidget {
   final HomeRepository repository = HomeRepository();
 
   Future<void> _logout(BuildContext context) async {
-    Navigator.of(context).pop();
-
     await repository.logout();
+
+    if (!context.mounted) return;
+
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const LoginScreen(),
+      ),
+          (route) => false,
+    );
   }
 
   @override
@@ -61,27 +70,21 @@ class HomeDrawer extends StatelessWidget {
                   ],
                 ),
               ),
-
               const SizedBox(height: 16),
-
               _drawerPage(
                 context,
                 icon: Icons.person_outline,
                 title: "Профіль",
-                page: const ProfileScreen(),
+                page: ProfileScreen(),
               ),
-
               _drawerPage(
                 context,
                 icon: Icons.settings_outlined,
                 title: "Налаштування",
-                page: const SettingsScreen(),
+                page: SettingsScreen(),
               ),
-
               const Spacer(),
-
               const Divider(color: Colors.white24),
-
               Padding(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 16,
@@ -89,9 +92,7 @@ class HomeDrawer extends StatelessWidget {
                 ),
                 child: Row(
                   children: [
-
                     const Spacer(),
-
                     TextButton.icon(
                       onPressed: () async {
                         final confirm = await showDialog<bool>(
@@ -99,7 +100,7 @@ class HomeDrawer extends StatelessWidget {
                           builder: (_) => const LogoutDialog(),
                         );
 
-                        if (confirm == true) {
+                        if (confirm == true && context.mounted) {
                           await _logout(context);
                         }
                       },
@@ -139,26 +140,16 @@ class HomeDrawer extends StatelessWidget {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
         ),
-        leading: const Icon(
-          Icons.circle,
-          size: 0,
-          color: Colors.transparent,
+        leading: Icon(
+          icon,
+          color: Colors.white70,
         ),
-        title: Row(
-          children: [
-            Icon(
-              icon,
-              color: Colors.white70,
-            ),
-            const SizedBox(width: 16),
-            Text(
-              title,
-              style: const TextStyle(
-                color: Colors.white70,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
+        title: Text(
+          title,
+          style: const TextStyle(
+            color: Colors.white70,
+            fontWeight: FontWeight.w600,
+          ),
         ),
         onTap: () {
           Navigator.pop(context);

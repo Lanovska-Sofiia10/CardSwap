@@ -1,91 +1,55 @@
 import 'dart:io';
 
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_storage/firebase_storage.dart';
-
 import '../models/user_profile_model.dart';
+import '../services/api_service.dart';
 
 class ProfileRepository {
-  final FirebaseAuth _auth = FirebaseAuth.instance;
-
-  final FirebaseFirestore _firestore =
-      FirebaseFirestore.instance;
-
-  final FirebaseStorage _storage =
-      FirebaseStorage.instance;
-
   Future<UserProfileModel?> loadProfile() async {
-    final user = _auth.currentUser;
+    final response = await ApiService.get("/profile");
 
-    if (user == null) return null;
-
-    final userDoc = await _firestore
-        .collection('users')
-        .doc(user.uid)
-        .get();
-
-    if (!userDoc.exists) return null;
-
-    final data = userDoc.data();
-
-    if (data == null) return null;
-
-    return UserProfileModel(
-      id: user.uid,
-      email: data['email'] ?? '',
-      displayName: data['displayName'] ?? '',
-      photoUrl: data['photoUrl'] ?? '',
-      fullName: data['fullName'] ?? '',
-      phone: data['phone'] ?? '',
-      position: data['position'] ?? '',
-    );
-  }
-
-  Future<String?> uploadPhoto({
-    required File? image,
-  }) async {
-    final user = _auth.currentUser;
-
-    if (user == null || image == null) {
+    if (response == null || response["data"] == null) {
       return null;
     }
 
-    final ref = _storage
-        .ref()
-        .child('profile_photos/${user.uid}.jpg');
+    final data = Map<String, dynamic>.from(response["data"]);
+    final String id = data["id"] ?? data["_id"] ?? "";
 
-    final snapshot = await ref.putFile(image);
-
-    if (snapshot.state != TaskState.success) {
-      return null;
-    }
-
-    return await ref.getDownloadURL();
+    return UserProfileModel.fromMap(id, data);
   }
 
-  Future<void> updateProfile({
+  Future<UserProfileModel> updateProfile({
     required String displayName,
     required String fullName,
     required String phone,
     required String position,
-    String? photoUrl,
+    File? photo,
   }) async {
-    final user = _auth.currentUser;
+    final response = await ApiService.putMultipart(
+      "/profile",
+      fields: {
+        "displayName": displayName,
+        "fullName": fullName,
+        "phone": phone,
+        "position": position,
+      },
+      file: photo,
+      fileField: "photo",
+    );
 
-    if (user == null) return;
+    if (response == null) {
+      throw Exception("Не вдалося отримати відповідь від сервера");
+    }
 
-    await _firestore
-        .collection('users')
-        .doc(user.uid)
-        .update({
-      'displayName': displayName,
-      'fullName': fullName,
-      'phone': phone,
-      'position': position,
+    if (response["success"] == false) {
+      throw Exception(response["message"] ?? "Помилка оновлення профілю");
+    }
 
-      if (photoUrl != null)
-        'photoUrl': photoUrl,
-    });
+    final Map<String, dynamic> data = (response.containsKey("data") && response["data"] != null)
+        ? Map<String, dynamic>.from(response["data"])
+        : Map<String, dynamic>.from(response);
+
+    final String id = data["id"] ?? data["_id"] ?? "";
+
+    return UserProfileModel.fromMap(id, data);
   }
 }

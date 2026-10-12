@@ -1,9 +1,9 @@
-import 'package:flutter/material.dart';
 import 'dart:io';
+import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../models/card_model.dart';
-import 'home_screen.dart';
 import '../../repositories/card_repository.dart';
+import '../../repositories/subscription_repository.dart';
 
 class CreateCardScreen extends StatefulWidget {
   const CreateCardScreen({super.key});
@@ -27,17 +27,44 @@ class _CreateCardScreenState extends State<CreateCardScreen> {
 
   bool _isSaving = false;
 
-  Color selectedColor = const Color(0xFFF59E0B);
+  Color? selectedColor;
+  List<Color> allowedColors = [];
+  bool isColorsLoading = true;
+
+  bool _showAllColors = false;
+
+  static const int _initialColorsCount = 6;
+
+  final SubscriptionRepository _subscriptionRepository = SubscriptionRepository();
   bool showInCatalog = true;
   File? selectedImage;
   final CardRepository repository = CardRepository();
 
+  @override
+  void initState() {
+    super.initState();
+    loadAllowedColors();
+  }
+
+  @override
+  void dispose() {
+    fullNameController.dispose();
+    positionController.dispose();
+    companyController.dispose();
+    emailController.dispose();
+    phoneController.dispose();
+    websiteController.dispose();
+    linkedinController.dispose();
+    telegramController.dispose();
+    instagramController.dispose();
+    githubController.dispose();
+    aboutController.dispose();
+    super.dispose();
+  }
+
   Future<void> pickImage() async {
     final picker = ImagePicker();
-
-    final image = await picker.pickImage(
-      source: ImageSource.gallery,
-    );
+    final image = await picker.pickImage(source: ImageSource.gallery);
 
     if (image != null) {
       setState(() {
@@ -46,12 +73,115 @@ class _CreateCardScreenState extends State<CreateCardScreen> {
     }
   }
 
+  Color _parseColor(dynamic rawColor) {
+    if (rawColor is int) {
+      return Color(rawColor);
+    } else if (rawColor is String) {
+      String hex = rawColor.replaceAll('#', '').replaceAll('0x', '');
+      if (hex.length == 6) {
+        hex = 'FF$hex';
+      }
+      final val = int.tryParse(hex, radix: 16);
+      if (val != null) return Color(val);
+    }
+    return const Color(0xFFF59E0B);
+  }
+
+  Future<void> loadAllowedColors() async {
+    try {
+      final dynamic response = await _subscriptionRepository.getAllowedColors();
+
+      List rawList = [];
+
+      if (response is List) {
+        rawList = response;
+      } else if (response is Map) {
+        if (response['data'] != null && response['data'] is Map) {
+          final data = response['data'] as Map;
+          if (data['limits'] != null && data['limits'] is Map) {
+            rawList = data['limits']['allowedColors'] ?? [];
+          } else if (data['allowedColors'] is List) {
+            rawList = data['allowedColors'];
+          }
+        } else if (response['limits'] != null && response['limits'] is Map) {
+          rawList = response['limits']['allowedColors'] ?? [];
+        } else if (response['allowedColors'] is List) {
+          rawList = response['allowedColors'];
+        }
+      }
+
+      final List<Color> parsed =
+      rawList.map((item) => _parseColor(item)).toList();
+
+      if (!mounted) return;
+
+      setState(() {
+        allowedColors = parsed;
+        if (allowedColors.isNotEmpty) {
+          selectedColor = allowedColors.first;
+        }
+        isColorsLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() {
+        isColorsLoading = false;
+      });
+
+      _showErrorSnackBar(e.toString().replaceAll('Exception: ', ''));
+    }
+  }
+
+  void _showErrorSnackBar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        elevation: 0,
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: Colors.transparent,
+        margin: const EdgeInsets.only(bottom: 20, left: 16, right: 16),
+        content: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          decoration: BoxDecoration(
+            color: const Color(0xFFEF4444),
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.12),
+                blurRadius: 16,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              const Icon(
+                Icons.error_outline_rounded,
+                color: Colors.white,
+                size: 20,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  message,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
-
       appBar: AppBar(
         backgroundColor: const Color(0xFF0F172A),
         elevation: 0,
@@ -63,7 +193,6 @@ class _CreateCardScreenState extends State<CreateCardScreen> {
           color: Colors.white,
         ),
       ),
-
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Container(
@@ -78,40 +207,33 @@ class _CreateCardScreenState extends State<CreateCardScreen> {
               )
             ],
           ),
-
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-
               const Text(
-                'Редагування візитки',
+                'Інформація про візитку',
                 style: TextStyle(
                   fontSize: 22,
                   fontWeight: FontWeight.bold,
                 ),
               ),
-
               const SizedBox(height: 24),
-
               Center(
                 child: Stack(
                   children: [
-                  CircleAvatar(
-                  radius: 45,
-                  backgroundColor: Colors.grey.shade200,
-                  backgroundImage:
-                  selectedImage != null
-                      ? FileImage(selectedImage!)
-                      : null,
-                  child: selectedImage == null
-                      ? const Icon(
-                    Icons.person,
-                    size: 45,
-                    color: Colors.grey,
-                  )
-                      : null,
-                ),
-
+                    CircleAvatar(
+                      radius: 45,
+                      backgroundColor: Colors.grey.shade200,
+                      backgroundImage:
+                      selectedImage != null ? FileImage(selectedImage!) : null,
+                      child: selectedImage == null
+                          ? const Icon(
+                        Icons.person,
+                        size: 45,
+                        color: Colors.grey,
+                      )
+                          : null,
+                    ),
                     Positioned(
                       right: 0,
                       bottom: 0,
@@ -133,70 +255,25 @@ class _CreateCardScreenState extends State<CreateCardScreen> {
                   ],
                 ),
               ),
-
               const SizedBox(height: 30),
-
-              _field(
-                'Повне ім\'я',
-                fullNameController,
-              ),
-
-              _field(
-                'Посада',
-                positionController,
-              ),
-
-              _field(
-                'Компанія',
-                companyController,
-              ),
-
-              _field(
-                'Електронна пошта',
-                emailController,
-              ),
-
-              _field(
-                'Телефон',
-                phoneController,
-              ),
-
-              _field(
-                'Вебсайт',
-                websiteController,
-              ),
-
-              _field(
-                'LinkedIn',
-                linkedinController,
-              ),
-
-              _field(
-                'Telegram',
-                telegramController,
-              ),
-
-              _field(
-                'Instagram',
-                instagramController,
-              ),
-
-              _field(
-                'GitHub',
-                githubController,
-              ),
-
+              _field('Повне ім\'я', fullNameController),
+              _field('Посада', positionController),
+              _field('Компанія', companyController),
+              _field('Електронна пошта', emailController),
+              _field('Телефон', phoneController),
+              _field('Вебсайт', websiteController),
+              _field('LinkedIn', linkedinController),
+              _field('Telegram', telegramController),
+              _field('Instagram', instagramController),
+              _field('GitHub', githubController),
               const SizedBox(height: 8),
-
               const Text(
                 'Про себе',
                 style: TextStyle(
                   fontWeight: FontWeight.w600,
                 ),
               ),
-
               const SizedBox(height: 8),
-
               TextField(
                 controller: aboutController,
                 maxLines: 5,
@@ -205,37 +282,84 @@ class _CreateCardScreenState extends State<CreateCardScreen> {
                   filled: true,
                   fillColor: Colors.grey.shade50,
                   border: OutlineInputBorder(
-                    borderRadius:
-                    BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(16),
                     borderSide: BorderSide.none,
                   ),
                 ),
               ),
-
               const SizedBox(height: 24),
-
               const Text(
                 'Колір візитки',
                 style: TextStyle(
                   fontWeight: FontWeight.w600,
                 ),
               ),
-
               const SizedBox(height: 12),
-
-              Row(
-                children: [
-                  _color(const Color(0xFFF59E0B)),
-                  _color(const Color(0xFF60A5FA)),
-                  _color(const Color(0xFF34D399)),
-                  _color(const Color(0xFFA78BFA)),
-                  _color(const Color(0xFFFB7185)),
-                  _color(const Color(0xFF22D3EE)),
+              if (isColorsLoading)
+                const Center(
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(vertical: 12),
+                    child: CircularProgressIndicator(),
+                  ),
+                )
+              else if (allowedColors.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 12),
+                  child: Text(
+                    'Не вдалося отримати кольори з сервера',
+                    style: TextStyle(color: Colors.red),
+                  ),
+                )
+              else ...[
+                  GridView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: _showAllColors
+                        ? allowedColors.length
+                        : allowedColors.length.clamp(0, _initialColorsCount),
+                    gridDelegate:
+                    const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 6,
+                      crossAxisSpacing: 10,
+                      mainAxisSpacing: 10,
+                      childAspectRatio: 1,
+                    ),
+                    itemBuilder: (context, index) {
+                      final color = allowedColors[index];
+                      return Center(
+                        child: _color(color),
+                      );
+                    },
+                  ),
+                  if (allowedColors.length > _initialColorsCount) ...[
+                    const SizedBox(height: 12),
+                    Center(
+                      child: TextButton.icon(
+                        onPressed: () {
+                          setState(() {
+                            _showAllColors = !_showAllColors;
+                          });
+                        },
+                        icon: Icon(
+                          _showAllColors
+                              ? Icons.keyboard_arrow_up
+                              : Icons.keyboard_arrow_down,
+                          color: const Color(0xFFF59E0B),
+                        ),
+                        label: Text(
+                          _showAllColors
+                              ? 'Показати менше'
+                              : 'Показати всі (${allowedColors.length})',
+                          style: const TextStyle(
+                            color: Color(0xFFF59E0B),
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ],
-              ),
-
               const SizedBox(height: 24),
-
               Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 16,
@@ -243,22 +367,15 @@ class _CreateCardScreenState extends State<CreateCardScreen> {
                 ),
                 decoration: BoxDecoration(
                   color: Colors.grey.shade100,
-                  borderRadius:
-                  BorderRadius.circular(16),
+                  borderRadius: BorderRadius.circular(16),
                 ),
                 child: Row(
-                  mainAxisAlignment:
-                  MainAxisAlignment.spaceBetween,
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text(
-                      'Показувати в каталозі',
-                    ),
+                    const Text('Показувати в каталозі'),
                     Switch(
                       value: showInCatalog,
-
-                      activeColor:
-                      const Color(0xFFF59E0B),
-
+                      activeColor: const Color(0xFFF59E0B),
                       onChanged: (value) {
                         setState(() {
                           showInCatalog = value;
@@ -268,108 +385,81 @@ class _CreateCardScreenState extends State<CreateCardScreen> {
                   ],
                 ),
               ),
-
               const SizedBox(height: 32),
-
               Row(
                 children: [
-
                   Expanded(
                     child: OutlinedButton(
                       onPressed: () {
                         Navigator.pop(context);
                       },
                       style: OutlinedButton.styleFrom(
-                        minimumSize:
-                        const Size.fromHeight(56),
-                        shape:
-                        RoundedRectangleBorder(
-                          borderRadius:
-                          BorderRadius.circular(
-                              16),
+                        minimumSize: const Size.fromHeight(56),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
                         ),
                       ),
-                      child: const Text(
-                        'Скасувати',
-                      ),
+                      child: const Text('Скасувати'),
                     ),
                   ),
-
                   const SizedBox(width: 12),
-
                   Expanded(
                     child: ElevatedButton(
-                        onPressed: _isSaving
-                            ? null
-                            : () async {
+                      onPressed: (_isSaving || selectedColor == null)
+                          ? null
+                          : () async {
+                        setState(() {
+                          _isSaving = true;
+                        });
 
-                          if (_isSaving) return;
+                        final int colorValueForBackend =
+                        selectedColor!.value.toUnsigned(32);
 
-                          setState(() {
-                            _isSaving = true;
-                          });
+                        final card = CardModel(
+                          id: '',
+                          ownerId: '',
+                          fullName: fullNameController.text.trim(),
+                          position: positionController.text.trim(),
+                          company: companyController.text.trim(),
+                          phone: phoneController.text.trim(),
+                          email: emailController.text.trim(),
+                          website: websiteController.text.trim(),
+                          linkedin: linkedinController.text.trim(),
+                          telegram: telegramController.text.trim(),
+                          instagram: instagramController.text.trim(),
+                          github: githubController.text.trim(),
+                          about: aboutController.text.trim(),
+                          photoUrl: '',
+                          cardColor: colorValueForBackend,
+                          showInCatalog: showInCatalog,
+                        );
 
-                          final card = CardModel(
-                            id: '',
-                            ownerId: '',
-                            fullName: fullNameController.text.trim(),
-                            position: positionController.text.trim(),
-                            company: companyController.text.trim(),
-                            phone: phoneController.text.trim(),
-                            email: emailController.text.trim(),
-                            website: websiteController.text.trim(),
-                            linkedin: linkedinController.text.trim(),
-                            telegram: telegramController.text.trim(),
-                            instagram: instagramController.text.trim(),
-                            github: githubController.text.trim(),
-                            about: aboutController.text.trim(),
-                            photoUrl: '',
-                            cardColor: selectedColor.value,
-                            showInCatalog: showInCatalog,
+                        try {
+                          await repository.createCard(
+                            card,
+                            selectedImage,
                           );
 
-                          try {
-                            await repository.createCard(
-                              card,
-                              selectedImage,
-                            );
+                          if (!mounted) return;
+                          Navigator.pop(context, true);
+                        } catch (e) {
+                          if (!mounted) return;
 
-                            if (!mounted) return;
+                          setState(() {
+                            _isSaving = false;
+                          });
 
-                            Navigator.pushAndRemoveUntil(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => const HomeScreen(),
-                              ),
-                                  (_) => false,
-                            );
-                          } catch (e) {
-                            if (mounted) {
-                              setState(() {
-                                _isSaving = false;
-                              });
-
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text(e.toString()),
-                                ),
-                              );
-                            }
-                          }
-                        },
-                      style:
-                      ElevatedButton.styleFrom(
-                        backgroundColor:
-                        const Color(0xFFF59E0B),
-                        foregroundColor:
-                        Colors.white,
-                        minimumSize:
-                        const Size.fromHeight(56),
-                        shape:
-                        RoundedRectangleBorder(
-                          borderRadius:
-                          BorderRadius.circular(
-                              16),
+                          _showErrorSnackBar(
+                            e.toString().replaceAll('Exception: ', ''),
+                          );
+                        }
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFF59E0B),
+                        foregroundColor: Colors.white,
+                        minimumSize: const Size.fromHeight(56),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
                         ),
                       ),
                       child: _isSaving
@@ -393,33 +483,24 @@ class _CreateCardScreenState extends State<CreateCardScreen> {
     );
   }
 
-  Widget _field(
-      String label,
-      TextEditingController controller,
-      ) {
+  Widget _field(String label, TextEditingController controller) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: Column(
-        crossAxisAlignment:
-        CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             label,
-            style: const TextStyle(
-              fontWeight: FontWeight.w600,
-            ),
+            style: const TextStyle(fontWeight: FontWeight.w600),
           ),
-
           const SizedBox(height: 8),
-
           TextField(
             controller: controller,
             decoration: InputDecoration(
               filled: true,
               fillColor: Colors.grey.shade50,
               border: OutlineInputBorder(
-                borderRadius:
-                BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(16),
                 borderSide: BorderSide.none,
               ),
             ),
@@ -430,7 +511,7 @@ class _CreateCardScreenState extends State<CreateCardScreen> {
   }
 
   Widget _color(Color color) {
-    final selected = selectedColor == color;
+    final selected = selectedColor?.value == color.value;
 
     return GestureDetector(
       onTap: () {
@@ -439,16 +520,15 @@ class _CreateCardScreenState extends State<CreateCardScreen> {
         });
       },
       child: Container(
-        margin: const EdgeInsets.only(right: 10),
-        width: 36,
-        height: 36,
+        width: 34,
+        height: 34,
         decoration: BoxDecoration(
           color: color,
           shape: BoxShape.circle,
           border: selected
               ? Border.all(
             color: Colors.black,
-            width: 2,
+            width: 2.5,
           )
               : null,
         ),

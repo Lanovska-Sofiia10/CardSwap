@@ -17,67 +17,98 @@ class _LoginScreenState extends State<LoginScreen> {
   final emailController = TextEditingController();
   final passwordController = TextEditingController();
   bool _obscurePassword = true;
-
+  String? errorMessage;
   final AuthRepository repository = AuthRepository();
 
   bool isLoading = false;
 
+  @override
+  void dispose() {
+    emailController.dispose();
+    passwordController.dispose();
+    super.dispose();
+  }
+
   Future<void> login() async {
+    final email = emailController.text.trim();
+    final password = passwordController.text;
+
+    // Перевіряємо, чи заповнені поля
+    if (email.isEmpty || password.isEmpty) {
+      setState(() {
+        errorMessage = 'Введіть Email та пароль';
+      });
+      return;
+    }
+
+    setState(() {
+      isLoading = true;
+      errorMessage = null;
+    });
+
     try {
-      setState(() => isLoading = true);
+      await repository.login(email: email, password: password);
 
-      final email = emailController.text.trim();
-      final password = passwordController.text;
+      final user = FirebaseAuth.instance.currentUser;
 
-      debugPrint('LOGIN EMAIL: $email');
-      debugPrint('LOGIN PASSWORD LENGTH: ${password.length}');
-
-      await repository.login(
-        email: email,
-        password: password,
-      );
-
-      debugPrint('FIREBASE LOGIN SUCCESS');
+      if (user != null) {
+        await user.getIdToken();
+      }
 
       await NotificationService.instance.saveTokenForCurrentUser();
-
-      debugPrint('FCM TOKEN SAVED');
 
       if (!mounted) return;
 
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(
-          builder: (_) => const HomeScreen(),
-        ),
+        MaterialPageRoute(builder: (_) => const HomeScreen()),
       );
     } on FirebaseAuthException catch (e) {
-      debugPrint('FIREBASE AUTH ERROR');
-      debugPrint('CODE: ${e.code}');
-      debugPrint('MESSAGE: ${e.message}');
-
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Firebase: ${e.code}\n${e.message ?? ''}',
-          ),
-        ),
-      );
+      String message = 'Не вдалося увійти. Спробуйте ще раз.';
+
+      switch (e.code) {
+        case 'user-not-found':
+          message = 'Користувача з таким Email не знайдено';
+          break;
+
+        case 'wrong-password':
+        case 'invalid-credential':
+          message = 'Неправильний Email або пароль';
+          break;
+
+        case 'invalid-email':
+          message = 'Введіть коректний Email';
+          break;
+
+        case 'user-disabled':
+          message = 'Цей обліковий запис заблоковано';
+          break;
+
+        case 'too-many-requests':
+          message = 'Забагато спроб. Спробуйте пізніше';
+          break;
+
+        case 'network-request-failed':
+          message = 'Перевірте підключення до Інтернету';
+          break;
+      }
+
+      setState(() {
+        errorMessage = message;
+      });
     } catch (e) {
-      debugPrint('OTHER LOGIN ERROR: $e');
-
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(e.toString()),
-        ),
-      );
+      setState(() {
+        errorMessage = 'Не вдалося виконати вхід. Спробуйте ще раз.';
+      });
     } finally {
       if (mounted) {
-        setState(() => isLoading = false);
+        setState(() {
+          isLoading = false;
+        });
       }
     }
   }
@@ -87,10 +118,9 @@ class _LoginScreenState extends State<LoginScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: SizedBox(
-            height: MediaQuery.of(context).size.height - 100,
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -130,13 +160,10 @@ class _LoginScreenState extends State<LoginScreen> {
 
                 const Text(
                   'Увійдіть у свій акаунт',
-                  style: TextStyle(
-                    color: Colors.grey,
-                    fontSize: 16,
-                  ),
+                  style: TextStyle(color: Colors.grey, fontSize: 16),
                 ),
 
-                const SizedBox(height: 40),
+                const SizedBox(height: 32),
 
                 Container(
                   padding: const EdgeInsets.all(24),
@@ -155,15 +182,23 @@ class _LoginScreenState extends State<LoginScreen> {
                     children: [
                       TextField(
                         controller: emailController,
+
+                        onChanged: (_) {
+                          if (errorMessage != null) {
+                            setState(() {
+                              errorMessage = null;
+                            });
+                          }
+                        },
+
+                        keyboardType: TextInputType.emailAddress,
                         decoration: InputDecoration(
                           hintText: 'Email',
-                          prefixIcon:
-                          const Icon(Icons.email_outlined),
+                          prefixIcon: const Icon(Icons.email_outlined),
                           filled: true,
                           fillColor: Colors.grey.shade50,
                           border: OutlineInputBorder(
-                            borderRadius:
-                            BorderRadius.circular(16),
+                            borderRadius: BorderRadius.circular(16),
                             borderSide: BorderSide.none,
                           ),
                         ),
@@ -171,64 +206,83 @@ class _LoginScreenState extends State<LoginScreen> {
 
                       const SizedBox(height: 16),
 
-                    TextField(
-                      controller: passwordController,
-                      obscureText: _obscurePassword,
-                      decoration: InputDecoration(
-                        hintText: 'Пароль',
-                        prefixIcon: const Icon(Icons.lock_outline),
+                      TextField(
+                        controller: passwordController,
 
-                        suffixIcon: IconButton(
-                          icon: Icon(
-                            _obscurePassword
-                                ? Icons.visibility_off
-                                : Icons.visibility,
-                          ),
-                          onPressed: () {
+                        onChanged: (_) {
+                          if (errorMessage != null) {
                             setState(() {
-                              _obscurePassword = !_obscurePassword;
+                              errorMessage = null;
                             });
-                          },
-                        ),
+                          }
+                        },
 
-                        filled: true,
-                        fillColor: Colors.grey.shade50,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(16),
-                          borderSide: BorderSide.none,
+                        obscureText: _obscurePassword,
+                        decoration: InputDecoration(
+                          hintText: 'Пароль',
+                          prefixIcon: const Icon(Icons.lock_outline),
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              _obscurePassword
+                                  ? Icons.visibility_off
+                                  : Icons.visibility,
+                            ),
+                            onPressed: () {
+                              setState(() {
+                                _obscurePassword = !_obscurePassword;
+                              });
+                            },
+                          ),
+                          filled: true,
+                          fillColor: Colors.grey.shade50,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(16),
+                            borderSide: BorderSide.none,
+                          ),
                         ),
                       ),
-                    ),
 
                       const SizedBox(height: 24),
+
+                      if (errorMessage != null) ...[
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            errorMessage!,
+                            style: const TextStyle(
+                              color: Colors.red,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                      ],
+
+                      const SizedBox(height: 12),
 
                       SizedBox(
                         width: double.infinity,
                         height: 56,
                         child: ElevatedButton(
-                          onPressed:
-                          isLoading ? null : login,
+                          onPressed: isLoading ? null : login,
                           style: ElevatedButton.styleFrom(
-                            backgroundColor:
-                            const Color(0xFFF59E0B),
+                            backgroundColor: const Color(0xFFF59E0B),
                             foregroundColor: Colors.white,
                             shape: RoundedRectangleBorder(
-                              borderRadius:
-                              BorderRadius.circular(16),
+                              borderRadius: BorderRadius.circular(16),
                             ),
                           ),
                           child: isLoading
                               ? const CircularProgressIndicator(
-                            color: Colors.white,
-                          )
+                                  color: Colors.white,
+                                )
                               : const Text(
-                            'Увійти',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight:
-                              FontWeight.w600,
-                            ),
-                          ),
+                                  'Увійти',
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
                         ),
                       ),
                     ],
@@ -242,16 +296,13 @@ class _LoginScreenState extends State<LoginScreen> {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (_) =>
-                        const ForgotPasswordScreen(),
+                        builder: (_) => const ForgotPasswordScreen(),
                       ),
                     );
                   },
                   child: const Text(
                     'Забули пароль?',
-                    style: TextStyle(
-                      color: Color(0xFFF59E0B),
-                    ),
+                    style: TextStyle(color: Color(0xFFF59E0B)),
                   ),
                 ),
 
@@ -259,17 +310,12 @@ class _LoginScreenState extends State<LoginScreen> {
                   onPressed: () {
                     Navigator.push(
                       context,
-                      MaterialPageRoute(
-                        builder: (_) =>
-                        const RegisterScreen(),
-                      ),
+                      MaterialPageRoute(builder: (_) => const RegisterScreen()),
                     );
                   },
                   child: const Text(
                     'Створити акаунт',
-                    style: TextStyle(
-                      color: Color(0xFF0F172A),
-                    ),
+                    style: TextStyle(color: Color(0xFF0F172A)),
                   ),
                 ),
               ],

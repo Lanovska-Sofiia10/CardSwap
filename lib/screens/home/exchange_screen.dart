@@ -10,6 +10,10 @@ import '../../widgets/card_picker_bottom_sheet.dart';
 import '../../repositories/exchange_api_repository.dart';
 import '../../services/notification_service.dart';
 import 'package:sensors_plus/sensors_plus.dart';
+import '../../models/subscription_model.dart';
+import '../../repositories/subscription_repository.dart';
+import '../../models/exchange_candidate_model.dart';
+import '../../widgets/exchange_candidate_bottom_sheet.dart';
 
 class ExchangeScreen extends StatefulWidget {
   const ExchangeScreen({super.key});
@@ -39,6 +43,26 @@ class _ExchangeScreenState
   final ExchangeApiRepository _exchangeApiRepository =
   ExchangeApiRepository();
 
+  final SubscriptionRepository _subscriptionRepository =
+  SubscriptionRepository();
+
+  SubscriptionModel? _subscription;
+
+  List<ExchangeCandidateModel> _candidates = [];
+
+  bool _loadingCandidates = false;
+
+  Timer? _candidatePollingTimer;
+
+  bool get _canExchange {
+    if (_subscription == null) {
+      return false;
+    }
+
+    return _subscription!.remainingContacts == null ||
+        _subscription!.remainingContacts! > 0;
+  }
+
   StreamSubscription<AccelerometerEvent>? _accelerometerSubscription;
 
   DateTime _lastShakeTime =
@@ -48,8 +72,8 @@ class _ExchangeScreenState
   @override
   void initState() {
     super.initState();
-
     loadCards();
+    _loadSubscription();
     _startAccelerometerListener();
   }
 
@@ -65,6 +89,189 @@ class _ExchangeScreenState
     setState(() {
       isLoading = false;
     });
+  }
+
+  bool _candidatesAreEqual(
+      List<ExchangeCandidateModel> first,
+      List<ExchangeCandidateModel> second,
+      ) {
+    if (first.length != second.length) {
+      return false;
+    }
+
+    for (int i = 0; i < first.length; i++) {
+      if (first[i].userId != second[i].userId ||
+          first[i].cardId != second[i].cardId ||
+          first[i].distance != second[i].distance) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  Future<void> _loadCandidates() async {
+    if (_loadingCandidates) {
+      return;
+    }
+
+    setState(() {
+      _loadingCandidates = true;
+    });
+
+    try {
+      final candidates =
+      await _exchangeApiRepository.getCandidates();
+
+      if (!mounted) {
+        return;
+      }
+
+      print(
+        'EXCHANGE CANDIDATES: FOUND ${candidates.length}',
+      );
+
+      for (final candidate in candidates) {
+        print(
+          'Candidate: '
+              '${candidate.userId}, '
+              'cardId=${candidate.cardId}, '
+              'distance=${candidate.distance}m',
+        );
+      }
+
+      if (!_candidatesAreEqual(
+        _candidates,
+        candidates,
+      )) {
+        setState(() {
+          _candidates = candidates;
+        });
+      }
+    } catch (e) {
+      print(
+        'EXCHANGE CANDIDATES ERROR: $e',
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Не вдалося знайти людей поруч: $e',
+          ),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _loadingCandidates = false;
+        });
+      }
+    }
+  }
+
+  void _startCandidatePolling() {
+    _candidatePollingTimer?.cancel();
+
+    _candidatePollingTimer = Timer.periodic(
+      const Duration(seconds: 1),
+          (timer) async {
+        if (!mounted) {
+          timer.cancel();
+          return;
+        }
+
+        if (_loadingCandidates) {
+          return;
+        }
+
+        await _loadCandidates();
+      },
+    );
+
+    Future.delayed(
+      const Duration(seconds: 10),
+          () {
+        if (!mounted) {
+          return;
+        }
+
+        _candidatePollingTimer?.cancel();
+        _candidatePollingTimer = null;
+
+        print(
+          'EXCHANGE CANDIDATES: POLLING STOPPED',
+        );
+      },
+    );
+  }
+
+  Future<void> _loadSubscription() async {
+    try {
+      final subscription =
+      await _subscriptionRepository.getSubscriptionModel();
+
+      if (!mounted) return;
+
+      print(
+        'Subscription: '
+            'plan=${subscription.plan}, '
+            'created=${subscription.contactsCreated}, '
+            'remaining=${subscription.remainingContacts}',
+      );
+
+      setState(() {
+        _subscription = subscription;
+      });
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Не вдалося отримати стан підписки',
+          ),
+        ),
+      );
+    }
+  }
+
+  Future<void> _showCandidatePicker() async {
+    if (!mounted) {
+      return;
+    }
+
+    await showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(24),
+        ),
+      ),
+      builder: (_) {
+        return ExchangeCandidateBottomSheet(
+          initialCandidates: _candidates,
+          onSelected: (candidate) {
+            Navigator.of(context).pop();
+
+            print(
+              'EXCHANGE CANDIDATE SELECTED: '
+                  '${candidate.userId}, '
+                  'cardId=${candidate.cardId}, '
+                  'distance=${candidate.distance}m',
+            );
+
+            // Наступним кроком:
+            // відправлення selection на backend.
+          },
+        );
+      },
+    );
   }
 
   void _startAccelerometerListener() {
@@ -132,32 +339,47 @@ class _ExchangeScreenState
   }
 
   Future<void> _startExchange() async {
-    if (selectedCard == null || _sending) {
+    if (selectedCard == null ||
+        _sending ||
+        !_canExchange) {
       return;
     }
+
+    _candidatePollingTimer?.cancel();
+    _candidatePollingTimer = null;
 
     setState(() {
       _sending = true;
     });
 
     try {
+      // 1. Створюємо власну waiting-заявку.
       await _exchangeApiRepository.sendExchange(
         cardId: selectedCard!.id,
       );
 
-      if (!mounted) return;
+      // 2. Після цього шукаємо інших
+      //    користувачів, які теж очікують обмін.
+      await _loadCandidates();
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Запит на обмін відправлено"),
-        ),
-      );
+      _startCandidatePolling();
+
+      if (!mounted) {
+        return;
+      }
+
+      await _showCandidatePicker();
+
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(e.toString()),
+          content: Text(
+            e.toString(),
+          ),
         ),
       );
     } finally {
@@ -192,6 +414,7 @@ class _ExchangeScreenState
 
   @override
   void dispose() {
+    _candidatePollingTimer?.cancel();
     _accelerometerSubscription?.cancel();
     super.dispose();
   }
@@ -236,11 +459,17 @@ class _ExchangeScreenState
                   ),
 
                   IconButton(
-                    icon: const Icon(
+                    icon: Icon(
                       Icons.qr_code_scanner,
-                      color: Color(0xFFF59E0B),
+                      color: _canExchange
+                          ? const Color(0xFFF59E0B)
+                          : Colors.grey,
                     ),
-                    onPressed: () {
+                    onPressed: !_canExchange
+                        ? null
+                        : () {
+                      if (selectedCard == null) return;
+
                       Navigator.push(
                         context,
                         MaterialPageRoute(
@@ -314,7 +543,9 @@ class _ExchangeScreenState
               width: 180,
               height: 48,
               child: ElevatedButton.icon(
-                onPressed: _sending ? null : _startExchange,
+                onPressed: _sending || !_canExchange
+                    ? null
+                    : _startExchange,
                 icon: const Icon(Icons.bolt),
                 label: const Text('Почати обмін'),
                 style: ElevatedButton.styleFrom(

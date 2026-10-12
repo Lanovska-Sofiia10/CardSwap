@@ -3,7 +3,8 @@ import '../models/card_model.dart';
 
 enum ContactState {
   none,
-  pending,
+  pendingOutgoing,
+  pendingIncoming,
   connected,
 }
 
@@ -190,7 +191,29 @@ class CatalogContactCardWidget extends StatelessWidget {
           ),
         );
 
-      case ContactState.pending:
+      case ContactState.pendingOutgoing:
+        return InkWell(
+          onTap: onPressed,
+          borderRadius: BorderRadius.circular(20),
+          child: Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: Colors.grey.shade300,
+              ),
+            ),
+            child: Icon(
+              Icons.schedule,
+              color: Colors.grey.shade500,
+              size: 20,
+            ),
+          ),
+        );
+
+      case ContactState.pendingIncoming:
         return Container(
           width: 38,
           height: 38,

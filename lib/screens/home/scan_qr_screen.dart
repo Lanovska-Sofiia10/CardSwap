@@ -17,9 +17,8 @@ class ScanQrScreen extends StatefulWidget {
 }
 
 class _ScanQrScreenState extends State<ScanQrScreen> {
-  bool _isScanned = false;
-  final ScanQrRepository _repository =
-  ScanQrRepository();
+  bool _isProcessing = false;
+  final ScanQrRepository _repository = ScanQrRepository();
 
   static const double frameSize = 260;
   static const double frameOffsetY = -40;
@@ -27,10 +26,7 @@ class _ScanQrScreenState extends State<ScanQrScreen> {
   @override
   void initState() {
     super.initState();
-
-    NotificationService.instance.addExchangeListener(
-      _onExchangeSuccess,
-    );
+    NotificationService.instance.addExchangeListener(_onExchangeSuccess);
   }
 
   void _onExchangeSuccess() {
@@ -47,6 +43,79 @@ class _ScanQrScreenState extends State<ScanQrScreen> {
     );
   }
 
+  void _showErrorSnackBar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        elevation: 0,
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: Colors.transparent,
+        margin: const EdgeInsets.only(bottom: 20, left: 16, right: 16),
+        content: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          decoration: BoxDecoration(
+            color: const Color(0xFFEF4444),
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.12),
+                blurRadius: 16,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              const Icon(
+                Icons.error_outline_rounded,
+                color: Colors.white,
+                size: 20,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  message,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _handleScan(String cardId) async {
+    if (_isProcessing) return;
+
+    setState(() {
+      _isProcessing = true;
+    });
+
+    try {
+      await _repository.exchangeCards(
+        scannedCardId: cardId,
+        myCardId: widget.myCardId,
+      );
+    } catch (e) {
+      if (!mounted) return;
+
+      final message = e.toString().replaceAll("Exception: ", "");
+      _showErrorSnackBar(message);
+
+      // Пауза перед можливістю повторного сканування
+      await Future.delayed(const Duration(seconds: 2));
+      if (!mounted) return;
+
+      setState(() {
+        _isProcessing = false;
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final screenSize = MediaQuery.of(context).size;
@@ -57,9 +126,7 @@ class _ScanQrScreenState extends State<ScanQrScreen> {
         backgroundColor: const Color(0xFF0F172A),
         elevation: 0,
         centerTitle: true,
-        iconTheme: const IconThemeData(
-          color: Colors.white,
-        ),
+        iconTheme: const IconThemeData(color: Colors.white),
         title: const Text(
           'Сканування QR',
           style: TextStyle(
@@ -80,22 +147,17 @@ class _ScanQrScreenState extends State<ScanQrScreen> {
               height: frameSize,
             ),
             onDetect: (capture) {
-              if (_isScanned) return;
+              if (_isProcessing) return;
 
               final barcodes = capture.barcodes;
               if (barcodes.isEmpty) return;
 
               final cardId = barcodes.first.rawValue;
-              if (cardId == null) return;
-
-              _isScanned = true;
-
-              debugPrint("SCANNED ID: $cardId");
+              if (cardId == null || cardId.isEmpty) return;
 
               _handleScan(cardId);
             },
           ),
-
           CustomPaint(
             size: Size.infinite,
             painter: ScannerOverlayPainter(
@@ -103,56 +165,59 @@ class _ScanQrScreenState extends State<ScanQrScreen> {
               offsetY: frameOffsetY,
             ),
           ),
-
-    Positioned(
-    top: 30,
-    left: 24,
-    right: 24,
-    child: Column(
-    children: const [
-    Icon(
-    Icons.qr_code_scanner,
-    size: 60,
-    color: Color(0xFFF59E0B),
-    ),
-    SizedBox(height: 16),
-    Text(
-    'Наведіть камеру на QR-код',
-    textAlign: TextAlign.center,
-    style: TextStyle(
-    fontSize: 26,
-    fontWeight: FontWeight.bold,
-    color: Colors.black,
-    ),
-    ),
-    ],
-    ),
-    ),
-
+          Positioned(
+            top: 30,
+            left: 24,
+            right: 24,
+            child: Column(
+              children: const [
+                Icon(
+                  Icons.qr_code_scanner,
+                  size: 60,
+                  color: Color(0xFFF59E0B),
+                ),
+                SizedBox(height: 16),
+                Text(
+                  'Наведіть камеру на QR-код',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 26,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black,
+                  ),
+                ),
+              ],
+            ),
+          ),
           Center(
             child: Transform.translate(
               offset: const Offset(0, frameOffsetY),
               child: Container(
                 width: frameSize,
                 height: frameSize,
-                  decoration: BoxDecoration(
-                    border: Border.all(
-                      color: const Color(0xFFF59E0B),
-                      width: 4,
-                    ),
-                    borderRadius: BorderRadius.circular(28),
-                    boxShadow: const [
-                      BoxShadow(
-                        color: Color(0x33F59E0B),
-                        blurRadius: 20,
-                        spreadRadius: 2,
-                      ),
-                    ],
+                decoration: BoxDecoration(
+                  border: Border.all(
+                    color: const Color(0xFFF59E0B),
+                    width: 4,
                   ),
+                  borderRadius: BorderRadius.circular(28),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Color(0x33F59E0B),
+                      blurRadius: 20,
+                      spreadRadius: 2,
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
-
+          if (_isProcessing)
+            const Center(
+              child: CircularProgressIndicator(
+                color: Color(0xFFF59E0B),
+              ),
+            ),
           Positioned(
             bottom: 80,
             left: 32,
@@ -173,29 +238,10 @@ class _ScanQrScreenState extends State<ScanQrScreen> {
 
   @override
   void dispose() {
-    NotificationService.instance.removeExchangeListener(
-      _onExchangeSuccess,
-    );
+    NotificationService.instance.removeExchangeListener(_onExchangeSuccess);
     super.dispose();
   }
-
-  Future<void> _handleScan(String cardId) async {
-    try {
-      debugPrint("START EXCHANGE");
-      debugPrint("My card: ${widget.myCardId}");
-      debugPrint("Target: $cardId");
-
-      await _repository.exchangeCards(
-        scannedCardId: cardId,
-        myCardId: widget.myCardId,
-      );
-
-      debugPrint("REQUEST FINISHED");
-    } catch (e) {
-      debugPrint("ERROR: $e");
-      _isScanned = false;
-    }
-  }}
+}
 
 class ScannerOverlayPainter extends CustomPainter {
   final double frameSize;
@@ -209,7 +255,7 @@ class ScannerOverlayPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = Colors.white
+      ..color = Colors.black.withOpacity(0.5)
       ..style = PaintingStyle.fill;
 
     final screenRect = Rect.fromLTWH(
@@ -244,4 +290,3 @@ class ScannerOverlayPainter extends CustomPainter {
   @override
   bool shouldRepaint(CustomPainter oldDelegate) => false;
 }
-

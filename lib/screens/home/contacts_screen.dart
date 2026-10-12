@@ -12,40 +12,84 @@ class ContactsScreen extends StatefulWidget {
 }
 
 class _ContactsScreenState extends State<ContactsScreen> {
-  final TextEditingController _searchController =
-  TextEditingController();
-  String _searchText = "";
-
-  final ContactRepository _contactRepository =
-  ContactRepository();
+  final TextEditingController _searchController = TextEditingController();
+  final ValueNotifier<String> _searchText = ValueNotifier<String>("");
+  final ContactRepository _contactRepository = ContactRepository();
 
   @override
   void initState() {
     super.initState();
-
     _searchController.addListener(() {
-      setState(() {
-        _searchText = _searchController.text.toLowerCase();
-      });
+      _searchText.value = _searchController.text.toLowerCase();
     });
   }
 
-  List<CardModel> _filterCards(List<CardModel> cards) {
-    if (_searchText.isEmpty) {
-      return cards;
+  List<ContactItem> _filterContacts(List<ContactItem> items, String searchText) {
+    if (searchText.isEmpty) {
+      return items;
     }
 
-    return cards.where((card) {
-      return card.fullName
-          .toLowerCase()
-          .contains(_searchText) ||
-          card.position
-              .toLowerCase()
-              .contains(_searchText) ||
-          card.company
-              .toLowerCase()
-              .contains(_searchText);
+    return items.where((item) {
+      final card = item.card;
+      return card.fullName.toLowerCase().contains(searchText) ||
+          card.position.toLowerCase().contains(searchText) ||
+          card.company.toLowerCase().contains(searchText);
     }).toList();
+  }
+
+  Future<void> _handleDeleteContact(ContactItem item) async {
+    try {
+      await _contactRepository.deleteContact(item.contactCardId);
+      // Успішне повідомлення прибрано — список оновиться через Stream
+    } catch (e) {
+      if (!mounted) return;
+      _showErrorSnackBar(e.toString().replaceAll("Exception: ", ""));
+    }
+  }
+
+  void _showErrorSnackBar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        elevation: 0,
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: Colors.transparent,
+        margin: const EdgeInsets.only(bottom: 20, left: 16, right: 16),
+        content: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          decoration: BoxDecoration(
+            color: const Color(0xFFEF4444),
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.12),
+                blurRadius: 16,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              const Icon(
+                Icons.error_outline_rounded,
+                color: Colors.white,
+                size: 20,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  message,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   Widget _buildHeader(int count) {
@@ -61,9 +105,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
               fontWeight: FontWeight.bold,
             ),
           ),
-
           const SizedBox(height: 8),
-
           Text(
             "Збережені візитки ($count)",
             style: const TextStyle(
@@ -71,9 +113,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
               fontSize: 16,
             ),
           ),
-
           const SizedBox(height: 18),
-
           Container(
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(12),
@@ -129,201 +169,223 @@ class _ContactsScreenState extends State<ContactsScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFF5F6FA),
       body: SafeArea(
-        child: StreamBuilder<List<CardModel>>(
+        child: StreamBuilder<List<ContactItem>>(
           stream: _contactRepository.contactsStream(),
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Center(
-                child: CircularProgressIndicator(),
-              );
+              return const Center(child: CircularProgressIndicator());
             }
 
             if (snapshot.hasError) {
               return Center(
-                child: Text(snapshot.error.toString()),
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.cloud_off_rounded,
+                        size: 70,
+                        color: Colors.grey,
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        snapshot.error.toString().replaceAll("Exception: ", ""),
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(fontSize: 16, color: Colors.black87),
+                      ),
+                      const SizedBox(height: 20),
+                      ElevatedButton.icon(
+                        onPressed: () {
+                          setState(() {});
+                        },
+                        icon: const Icon(Icons.refresh_rounded),
+                        label: const Text("Спробувати знову"),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFF59E0B),
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               );
             }
 
-            List<CardModel> cards =
-            _filterCards(snapshot.data ?? []);
+            final allContacts = snapshot.data ?? [];
 
-            return Column(
-              children: [
-                _buildHeader(snapshot.data?.length ?? 0),
+            return ValueListenableBuilder<String>(
+              valueListenable: _searchText,
+              builder: (context, searchText, _) {
+                final contacts = _filterContacts(allContacts, searchText);
 
-                Expanded(
-                  child: cards.isEmpty
-                      ? _buildEmptyState()
-                      : ListView.separated(
-                    padding: const EdgeInsets.all(16),
-                    itemCount: cards.length,
-                    separatorBuilder: (_, __) =>
-                    const SizedBox(height: 16),
-                    itemBuilder: (_, index) {
-                      final card = cards[index];
+                return Column(
+                  children: [
+                    _buildHeader(allContacts.length),
+                    Expanded(
+                      child: contacts.isEmpty
+                          ? _buildEmptyState()
+                          : ListView.separated(
+                        padding: const EdgeInsets.all(16),
+                        itemCount: contacts.length,
+                        separatorBuilder: (_, __) =>
+                        const SizedBox(height: 16),
+                        itemBuilder: (_, index) {
+                          final item = contacts[index];
+                          final card = item.card;
 
-                      return GestureDetector(
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => CardDetailsScreen(
-                                card: card,
-                                canViewContacts: true,
-                              ),
-                            ),
-                          );
-                        },
-                        child: Stack(
-                          children: [
-
-                            CardViewWidget(
-                              card: card,
-                            ),
-
-                            Positioned(
-                              right: 16,
-                              top: 16,
-                              child: IconButton(
-                                icon: const Icon(
-                                  Icons.delete_outline,
-                                  color: Colors.black87,
-                                  size: 24,
+                          return GestureDetector(
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => CardDetailsScreen(
+                                    card: card,
+                                    canViewContacts: true,
+                                  ),
                                 ),
-                                onPressed: () async {
-
-                                  final delete = await showDialog<bool>(
-                                    context: context,
-                                    barrierDismissible: true,
-                                    builder: (_) => Dialog(
-                                      backgroundColor: Colors.transparent,
-                                      child: Container(
-                                        padding: const EdgeInsets.all(24),
-                                        decoration: BoxDecoration(
-                                          color: Colors.white,
-                                          borderRadius: BorderRadius.circular(24),
-                                          boxShadow: [
-                                            BoxShadow(
-                                              color: Colors.black.withOpacity(0.12),
-                                              blurRadius: 25,
-                                              offset: const Offset(0, 10),
-                                            ),
-                                          ],
-                                        ),
-                                        child: Column(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-
-                                            Container(
-                                              width: 70,
-                                              height: 70,
-                                              decoration: const BoxDecoration(
-                                                color: Color(0xFFFFF4DB),
-                                                shape: BoxShape.circle,
-                                              ),
-                                              child: const Icon(
-                                                Icons.delete_outline,
-                                                color: Color(0xFFF59E0B),
-                                                size: 36,
-                                              ),
-                                            ),
-
-                                            const SizedBox(height: 20),
-
-                                            const Text(
-                                              "Видалити контакт?",
-                                              style: TextStyle(
-                                                fontSize: 22,
-                                                fontWeight: FontWeight.bold,
-                                              ),
-                                            ),
-
-                                            const SizedBox(height: 12),
-
-                                            Text(
-                                              "Контакт\n${card.fullName}\nбуде видалено у вас та у користувача, з яким ви обмінялися візитками.",
-                                              textAlign: TextAlign.center,
-                                              style: TextStyle(
-                                                color: Colors.grey.shade700,
-                                                height: 1.5,
-                                                fontSize: 15,
-                                              ),
-                                            ),
-
-                                            const SizedBox(height: 28),
-
-                                            Row(
-                                              children: [
-
-                                                Expanded(
-                                                  child: OutlinedButton(
-                                                    onPressed: () {
-                                                      Navigator.pop(context, false);
-                                                    },
-                                                    style: OutlinedButton.styleFrom(
-                                                      minimumSize: const Size.fromHeight(50),
-                                                      side: BorderSide(
-                                                        color: Colors.grey.shade300,
-                                                      ),
-                                                      shape: RoundedRectangleBorder(
-                                                        borderRadius: BorderRadius.circular(14),
-                                                      ),
-                                                    ),
-                                                    child: const Text(
-                                                      "Скасувати",
-                                                      style: TextStyle(
-                                                        color: Colors.black87,
-                                                        fontWeight: FontWeight.w600,
-                                                      ),
-                                                    ),
-                                                  ),
-                                                ),
-
-                                                const SizedBox(width: 12),
-
-                                                Expanded(
-                                                  child: ElevatedButton(
-                                                    onPressed: () {
-                                                      Navigator.pop(context, true);
-                                                    },
-                                                    style: ElevatedButton.styleFrom(
-                                                      backgroundColor: const Color(0xFFF59E0B),
-                                                      foregroundColor: Colors.white,
-                                                      minimumSize: const Size.fromHeight(50),
-                                                      elevation: 0,
-                                                      shape: RoundedRectangleBorder(
-                                                        borderRadius: BorderRadius.circular(14),
-                                                      ),
-                                                    ),
-                                                    child: const Text(
-                                                      "Видалити",
-                                                      style: TextStyle(
-                                                        fontWeight: FontWeight.w600,
-                                                      ),
-                                                    ),
-                                                  ),
+                              );
+                            },
+                            child: Stack(
+                              children: [
+                                CardViewWidget(card: card),
+                                Positioned(
+                                  right: 16,
+                                  top: 16,
+                                  child: IconButton(
+                                    icon: const Icon(
+                                      Icons.delete_outline,
+                                      color: Colors.black87,
+                                      size: 24,
+                                    ),
+                                    onPressed: () async {
+                                      final delete = await showDialog<bool>(
+                                        context: context,
+                                        barrierDismissible: true,
+                                        builder: (_) => Dialog(
+                                          backgroundColor: Colors.transparent,
+                                          child: Container(
+                                            padding: const EdgeInsets.all(24),
+                                            decoration: BoxDecoration(
+                                              color: Colors.white,
+                                              borderRadius: BorderRadius.circular(24),
+                                              boxShadow: [
+                                                BoxShadow(
+                                                  color: Colors.black.withOpacity(0.12),
+                                                  blurRadius: 25,
+                                                  offset: const Offset(0, 10),
                                                 ),
                                               ],
                                             ),
-                                          ],
+                                            child: Column(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Container(
+                                                  width: 70,
+                                                  height: 70,
+                                                  decoration: const BoxDecoration(
+                                                    color: Color(0xFFFFF4DB),
+                                                    shape: BoxShape.circle,
+                                                  ),
+                                                  child: const Icon(
+                                                    Icons.delete_outline,
+                                                    color: Color(0xFFF59E0B),
+                                                    size: 36,
+                                                  ),
+                                                ),
+                                                const SizedBox(height: 20),
+                                                const Text(
+                                                  "Видалити контакт?",
+                                                  style: TextStyle(
+                                                    fontSize: 22,
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
+                                                ),
+                                                const SizedBox(height: 12),
+                                                Text(
+                                                  "Контакт\n${card.fullName}\nбуде видалено з вашого списку.",
+                                                  textAlign: TextAlign.center,
+                                                  style: TextStyle(
+                                                    color: Colors.grey.shade700,
+                                                    height: 1.5,
+                                                    fontSize: 15,
+                                                  ),
+                                                ),
+                                                const SizedBox(height: 28),
+                                                Row(
+                                                  children: [
+                                                    Expanded(
+                                                      child: OutlinedButton(
+                                                        onPressed: () {
+                                                          Navigator.pop(context, false);
+                                                        },
+                                                        style: OutlinedButton.styleFrom(
+                                                          minimumSize: const Size.fromHeight(50),
+                                                          side: BorderSide(
+                                                            color: Colors.grey.shade300,
+                                                          ),
+                                                          shape: RoundedRectangleBorder(
+                                                            borderRadius: BorderRadius.circular(14),
+                                                          ),
+                                                        ),
+                                                        child: const Text(
+                                                          "Скасувати",
+                                                          style: TextStyle(
+                                                            color: Colors.black87,
+                                                            fontWeight: FontWeight.w600,
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    ),
+                                                    const SizedBox(width: 12),
+                                                    Expanded(
+                                                      child: ElevatedButton(
+                                                        onPressed: () {
+                                                          Navigator.pop(context, true);
+                                                        },
+                                                        style: ElevatedButton.styleFrom(
+                                                          backgroundColor: const Color(0xFFF59E0B),
+                                                          foregroundColor: Colors.white,
+                                                          minimumSize: const Size.fromHeight(50),
+                                                          elevation: 0,
+                                                          shape: RoundedRectangleBorder(
+                                                            borderRadius: BorderRadius.circular(14),
+                                                          ),
+                                                        ),
+                                                        child: const Text(
+                                                          "Видалити",
+                                                          style: TextStyle(
+                                                            fontWeight: FontWeight.w600,
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ],
+                                            ),
+                                          ),
                                         ),
-                                      ),
-                                    ),
-                                  );
+                                      );
 
-                                  if (delete == true) {
-                                    await _contactRepository.deleteContact(card.id);
-                                  }
-                                },
-                              ),
+                                      if (delete == true) {
+                                        await _handleDeleteContact(item);
+                                      }
+                                    },
+                                  ),
+                                ),
+                              ],
                             ),
-                          ],
-                        ),
-                      );
-                    },
-                  ),
-                ),
-              ],
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                );
+              },
             );
           },
         ),
@@ -341,9 +403,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
             size: 70,
             color: Colors.grey.shade500,
           ),
-
           const SizedBox(height: 16),
-
           const Text(
             'Поки що немає контактів',
             style: TextStyle(
@@ -351,9 +411,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
               fontWeight: FontWeight.w600,
             ),
           ),
-
           const SizedBox(height: 8),
-
           const Text(
             'Потрясіть телефон або свайпніть,\nщоб обмінятись візитками',
             textAlign: TextAlign.center,
@@ -366,6 +424,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
   @override
   void dispose() {
     _searchController.dispose();
+    _searchText.dispose();
     super.dispose();
   }
 }

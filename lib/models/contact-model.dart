@@ -1,13 +1,12 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 class ContactModel {
   final String id;
-
   final String ownerUserId;
   final String ownerCardId;
-
   final String contactUserId;
   final String contactCardId;
-
-  final DateTime createdAt;
+  final DateTime? createdAt;
 
   ContactModel({
     required this.id,
@@ -15,22 +14,27 @@ class ContactModel {
     required this.ownerCardId,
     required this.contactUserId,
     required this.contactCardId,
-    required this.createdAt,
+    this.createdAt,
   });
 
   factory ContactModel.fromJson(
       Map<String, dynamic> json,
       String id,
       ) {
+    DateTime? parsedDate;
+    if (json['createdAt'] is Timestamp) {
+      parsedDate = (json['createdAt'] as Timestamp).toDate();
+    } else if (json['createdAt'] is String) {
+      parsedDate = DateTime.tryParse(json['createdAt']);
+    }
+
     return ContactModel(
       id: id,
       ownerUserId: json['ownerUserId'] ?? '',
       ownerCardId: json['ownerCardId'] ?? '',
       contactUserId: json['contactUserId'] ?? '',
       contactCardId: json['contactCardId'] ?? '',
-      createdAt: DateTime.parse(
-        json['createdAt'],
-      ),
+      createdAt: parsedDate,
     );
   }
 
@@ -40,7 +44,9 @@ class ContactModel {
       'ownerCardId': ownerCardId,
       'contactUserId': contactUserId,
       'contactCardId': contactCardId,
-      'createdAt': createdAt.toIso8601String(),
+      'createdAt': createdAt != null
+          ? Timestamp.fromDate(createdAt!)
+          : FieldValue.serverTimestamp(),
     };
   }
 }

@@ -1,7 +1,9 @@
 import 'dart:convert';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:http/http.dart' as http;
 import 'backend_service.dart';
+import 'notification_service.dart';
 
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -55,6 +57,12 @@ class AuthService {
   }
 
   Future<void> logout() async {
+    try {
+      // Видаляємо FCM токен користувача з бази перед виходом
+      await NotificationService.instance.deleteCurrentToken();
+    } catch (e) {
+      debugPrint('Error deleting FCM token on logout: $e');
+    }
     await _auth.signOut();
   }
 }

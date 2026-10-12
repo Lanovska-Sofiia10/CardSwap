@@ -10,34 +10,34 @@ class CatalogRequestsResponse {
   factory CatalogRequestsResponse.fromJson(
       Map<String, dynamic> json,
       ) {
+    final rawRequests = json["requests"] as List? ?? [];
+
     return CatalogRequestsResponse(
-      requests: (json["requests"] as List)
+      requests: rawRequests
           .map(
             (e) => ContactRequestModel.fromJson(
-          e,
-          e["requestId"],
+          e as Map<String, dynamic>,
+          e["requestId"] ?? "",
         ),
       )
           .toList(),
     );
   }
 
-  static DateTime _parseCreatedAt(dynamic value) {
+  /// Універсальний парсер Timestamp для використанная в ContactRequestModel
+  static DateTime parseCreatedAt(dynamic value) {
     if (value is String) {
-      return DateTime.parse(value);
+      return DateTime.tryParse(value) ?? DateTime.now();
     }
 
     if (value is Map<String, dynamic>) {
       final seconds = value['_seconds'] ?? value['seconds'];
-      final nanoseconds =
-          value['_nanoseconds'] ?? value['nanoseconds'] ?? 0;
+      final nanoseconds = value['_nanoseconds'] ?? value['nanoseconds'] ?? 0;
 
       if (seconds is num) {
         return DateTime.fromMillisecondsSinceEpoch(
           seconds.toInt() * 1000 +
-              (nanoseconds is num
-                  ? nanoseconds.toInt() ~/ 1000000
-                  : 0),
+              (nanoseconds is num ? nanoseconds.toInt() ~/ 1000000 : 0),
         );
       }
     }
