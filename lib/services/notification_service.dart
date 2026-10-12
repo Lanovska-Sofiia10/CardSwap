@@ -102,12 +102,11 @@ class NotificationService {
     );
 
     await _localNotifications.initialize(
-      const InitializationSettings(
+      settings: const InitializationSettings(
         android: androidSettings,
         iOS: iosSettings,
       ),
       onDidReceiveNotificationResponse: (details) {
-        // Обробка натискання на локальне сповіщення (Android)
         _handleMessageDataPayload(details.payload);
       },
     );
@@ -133,10 +132,10 @@ class NotificationService {
 
       if (notification != null && defaultTargetPlatform == TargetPlatform.android) {
         await _localNotifications.show(
-          notification.hashCode,
-          notification.title,
-          notification.body,
-          NotificationDetails(
+          id: notification.hashCode,
+          title: notification.title,
+          body: notification.body,
+          notificationDetails: NotificationDetails(
             android: AndroidNotificationDetails(
               channel.id,
               channel.name,

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../../models/card_model.dart';
 import '../../widgets/card_details_screen.dart';
 import '../../widgets/card_view_widget.dart';
 import '../../repositories/contact_repository.dart';
