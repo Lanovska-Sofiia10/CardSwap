@@ -28,23 +28,6 @@ jobs:
     - name: Install dependencies
       run: flutter pub get
 
-    - name: Generate & Configure Podfile for iOS 14.0
-      run: |
-        cd ios
-        # Примусово генеруємо Podfile через flutter build або створюємо мінімальний
-        flutter build ios --config-only --no-codesign
-        
-        # Налаштовуємо платформу iOS 14.0 у Podfile
-        if [ -f Podfile ]; then
-          sed -i '' "s/# platform :ios, '12.0'/platform :ios, '14.0'/g" Podfile
-          sed -i '' "s/platform :ios, '12.0'/platform :ios, '14.0'/g" Podfile
-          sed -i '' "s/platform :ios, '11.0'/platform :ios, '14.0'/g" Podfile
-          sed -i '' "s/platform :ios, '13.0'/platform :ios, '14.0'/g" Podfile
-        fi
-        
-        pod repo update
-        pod install --repo-update
-
     - name: Build iOS (No codesign)
       run: flutter build ios --release --no-codesign
 
