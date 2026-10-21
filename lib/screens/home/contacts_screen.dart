@@ -15,6 +15,8 @@ class _ContactsScreenState extends State<ContactsScreen> {
   final ValueNotifier<String> _searchText = ValueNotifier<String>("");
   final ContactRepository _contactRepository = ContactRepository();
 
+  List<ContactItem>? _localContacts;
+
   @override
   void initState() {
     super.initState();
@@ -37,9 +39,14 @@ class _ContactsScreenState extends State<ContactsScreen> {
   }
 
   Future<void> _handleDeleteContact(ContactItem item) async {
+    // 1. Одразу прибираємо контакт із локального списку на екрані
+    setState(() {
+      _localContacts?.removeWhere((c) => c.contactCardId == item.contactCardId);
+    });
+
     try {
+      // 2. Викликаємо видалення на бекенді
       await _contactRepository.deleteContact(item.contactCardId);
-      // Успішне повідомлення прибрано — список оновиться через Stream
     } catch (e) {
       if (!mounted) return;
       _showErrorSnackBar(e.toString().replaceAll("Exception: ", ""));
@@ -171,11 +178,11 @@ class _ContactsScreenState extends State<ContactsScreen> {
         child: StreamBuilder<List<ContactItem>>(
           stream: _contactRepository.contactsStream(),
           builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
+            if (snapshot.connectionState == ConnectionState.waiting && _localContacts == null) {
               return const Center(child: CircularProgressIndicator());
             }
 
-            if (snapshot.hasError) {
+            if (snapshot.hasError && _localContacts == null) {
               return Center(
                 child: Padding(
                   padding: const EdgeInsets.all(24),
@@ -214,7 +221,11 @@ class _ContactsScreenState extends State<ContactsScreen> {
               );
             }
 
-            final allContacts = snapshot.data ?? [];
+            if (snapshot.hasData) {
+              _localContacts = snapshot.data;
+            }
+
+            final allContacts = _localContacts ?? [];
 
             return ValueListenableBuilder<String>(
               valueListenable: _searchText,

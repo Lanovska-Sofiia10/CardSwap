@@ -33,6 +33,8 @@ class SettingsRepository {
 
   Future<void> deleteAccount() async {
     await ApiService.delete('/users/me', {});
+
+    await _auth.signOut();
   }
 
   Future<void> sendResetPasswordEmail() async {

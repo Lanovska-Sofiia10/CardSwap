@@ -4,6 +4,7 @@ import 'package:image_picker/image_picker.dart';
 import '../../models/card_model.dart';
 import '../../repositories/card_repository.dart';
 import '../../repositories/subscription_repository.dart';
+import 'home_screen.dart';
 
 class CreateCardScreen extends StatefulWidget {
   const CreateCardScreen({super.key});
@@ -391,7 +392,15 @@ class _CreateCardScreenState extends State<CreateCardScreen> {
                   Expanded(
                     child: OutlinedButton(
                       onPressed: () {
-                        Navigator.pop(context);
+                        if (Navigator.canPop(context)) {
+                          Navigator.pop(context, false);
+                        } else {
+                          Navigator.pushAndRemoveUntil(
+                            context,
+                            MaterialPageRoute(builder: (_) => HomeScreen()),
+                                (route) => false,
+                          );
+                        }
                       },
                       style: OutlinedButton.styleFrom(
                         minimumSize: const Size.fromHeight(56),

@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../repositories/auth_repository.dart';
 import '../../services/notification_service.dart';
 import '../home/create_card_screen.dart';
+import '../home/home_screen.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -17,6 +18,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final emailController = TextEditingController();
   final passwordController = TextEditingController();
   bool _obscurePassword = true;
+  bool _isPrivacyPolicyAccepted = false; // Стан для галочки
   String? errorMessage;
 
   final AuthRepository repository = AuthRepository();
@@ -73,11 +75,21 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
       if (!mounted) return;
 
-      Navigator.pushReplacement(
+      // Відкриваємо екран створення візитки
+      final created = await Navigator.push<bool>(
         context,
         MaterialPageRoute(
           builder: (_) => const CreateCardScreen(),
         ),
+      );
+
+      if (!mounted) return;
+
+      // Після створення картки або закриття повністю очищаємо стек і відкриваємо HomeScreen
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (_) => const HomeScreen()),
+            (route) => false,
       );
     } on FirebaseAuthException catch (e) {
       if (!mounted) return;
@@ -88,23 +100,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
         case 'email-already-in-use':
           message = 'Акаунт із цим Email вже існує';
           break;
-
         case 'invalid-email':
           message = 'Введіть коректний Email';
           break;
-
         case 'weak-password':
           message = 'Пароль занадто простий (мінімум 6 символів)';
           break;
-
         case 'operation-not-allowed':
           message = 'Реєстрацію через Email вимкнено';
           break;
-
         case 'network-request-failed':
           message = 'Перевірте підключення до Інтернету';
           break;
-
         case 'too-many-requests':
           message = 'Забагато спроб. Спробуйте пізніше';
           break;
@@ -261,6 +268,61 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         ),
                       ),
 
+                      const SizedBox(height: 16),
+
+                      // Плашка з галочкою (Checkbox) та посиланням на Політику конфіденційності
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          SizedBox(
+                            height: 24,
+                            width: 24,
+                            child: Checkbox(
+                              value: _isPrivacyPolicyAccepted,
+                              activeColor: const Color(0xFFF59E0B),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              onChanged: (bool? value) {
+                                setState(() {
+                                  _isPrivacyPolicyAccepted = value ?? false;
+                                  if (errorMessage != null) {
+                                    errorMessage = null;
+                                  }
+                                });
+                              },
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: RichText(
+                              text: TextSpan(
+                                style: TextStyle(
+                                  color: Colors.grey.shade700,
+                                  fontSize: 13,
+                                  height: 1.3,
+                                ),
+                                children: [
+                                  const TextSpan(
+                                    text: 'Ознайомилася з ',
+                                  ),
+                                  TextSpan(
+                                    text: 'політикою конфіденційності',
+                                    style: const TextStyle(
+                                      color: Color(0xFFF59E0B),
+                                      fontWeight: FontWeight.bold,
+                                      decoration: TextDecoration.underline,
+                                    ),
+                                    recognizer: TapGestureRecognizer()
+                                      ..onTap = _openPrivacyPolicy,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+
                       if (errorMessage != null) ...[
                         const SizedBox(height: 16),
                         Align(
@@ -281,10 +343,16 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         width: double.infinity,
                         height: 56,
                         child: ElevatedButton(
-                          onPressed: isLoading ? null : register,
+                          // Кнопка заблокована (null), якщо йде завантаження або НЕ прийнята політика
+                          onPressed: (isLoading || !_isPrivacyPolicyAccepted)
+                              ? null
+                              : register,
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFFF59E0B),
+                            disabledBackgroundColor:
+                            const Color(0xFFF59E0B).withOpacity(0.4),
                             foregroundColor: Colors.white,
+                            disabledForegroundColor: Colors.white.withOpacity(0.7),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(16),
                             ),
@@ -300,37 +368,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                               fontWeight: FontWeight.w600,
                             ),
                           ),
-                        ),
-                      ),
-
-                      const SizedBox(height: 18),
-
-                      RichText(
-                        textAlign: TextAlign.center,
-                        text: TextSpan(
-                          style: TextStyle(
-                            color: Colors.grey.shade600,
-                            fontSize: 12,
-                            height: 1.4,
-                          ),
-                          children: [
-                            const TextSpan(
-                              text: 'Натискаючи «Зареєструватися», ви погоджуєтеся з нашою ',
-                            ),
-                            TextSpan(
-                              text: 'Політикою конфіденційності',
-                              style: const TextStyle(
-                                color: Color(0xFFF59E0B),
-                                fontWeight: FontWeight.bold,
-                                decoration: TextDecoration.underline,
-                              ),
-                              recognizer: TapGestureRecognizer()
-                                ..onTap = _openPrivacyPolicy,
-                            ),
-                            const TextSpan(
-                              text: '.',
-                            ),
-                          ],
                         ),
                       ),
                     ],

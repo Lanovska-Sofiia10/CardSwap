@@ -603,7 +603,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
                       if (!mounted) return;
 
-                      Navigator.pop(context);
+                      Navigator.pop(context); // закриваємо діалог завантаження
+
+                      // Переходимо на екран входу і очищаємо весь стек навігації
                       Navigator.pushAndRemoveUntil(
                         context,
                         MaterialPageRoute(builder: (_) => const LoginScreen()),
@@ -632,8 +634,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       Navigator.pop(context);
 
                       _showErrorSnackBar(e.toString().replaceAll("Exception: ", ""));
-                    }
-                  },
+                    }                  },
               ),
             ),
 

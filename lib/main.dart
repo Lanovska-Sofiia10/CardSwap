@@ -30,11 +30,17 @@ Future<void> main() async {
   await NotificationService.instance.initialize();
   await LocationService.start();
 
-  FirebaseAuth.instance.authStateChanges().listen((user) {
-    if (user != null) {
-      NotificationService.instance.saveTokenForCurrentUser();
-    }
-  });
+  // Додаємо безпечну обробку підписки та перевірку помилок
+  FirebaseAuth.instance.authStateChanges().listen(
+        (user) {
+      if (user != null) {
+        NotificationService.instance.saveTokenForCurrentUser();
+      }
+    },
+    onError: (error) {
+      debugPrint('Auth state listener error: $error');
+    },
+  );
 
   runApp(const MyApp());
 }

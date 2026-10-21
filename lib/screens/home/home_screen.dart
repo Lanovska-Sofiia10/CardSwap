@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../../repositories/home_repository.dart';
+import '../../repositories/notification_repository.dart';
+import '../../services/notification_service.dart';
 import '../../widgets/home_drawer.dart';
 import 'catalog_screen.dart';
 import 'contacts_screen.dart';
@@ -22,14 +23,36 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   final GlobalKey<ScaffoldState> scaffoldKey = GlobalKey<ScaffoldState>();
-  final HomeRepository repository = HomeRepository();
+  final NotificationRepository notificationRepository = NotificationRepository();
 
   int currentIndex = 0;
+  bool hasUnread = false;
 
   @override
   void initState() {
     super.initState();
     currentIndex = widget.initialIndex;
+    _checkUnread();
+
+    NotificationService.instance.addNotificationListener(_checkUnread);
+  }
+
+  @override
+  void dispose() {
+    NotificationService.instance.removeNotificationListener(_checkUnread);
+    super.dispose();
+  }
+
+  Future<void> _checkUnread() async {
+    try {
+      final requests = await notificationRepository.getRequests();
+      final unreadCount = requests.where((r) => !r.isRead).length;
+
+      if (!mounted) return;
+      setState(() {
+        hasUnread = unreadCount > 0;
+      });
+    } catch (_) {}
   }
 
   final screens = const [
@@ -66,28 +89,22 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         centerTitle: true,
         actions: [
-          StreamBuilder<bool>(
-            stream: repository.hasUnreadRequests(),
-            builder: (context, snapshot) {
-              final hasUnread = snapshot.data ?? false;
-
-              return IconButton(
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const NotificationsScreen(),
-                    ),
-                  );
-                },
-                icon: Icon(
-                  hasUnread
-                      ? Icons.notifications_rounded
-                      : Icons.notifications_none_rounded,
-                  color: Colors.white,
+          IconButton(
+            onPressed: () async {
+              await Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const NotificationsScreen(),
                 ),
               );
+              _checkUnread();
             },
+            icon: Icon(
+              hasUnread
+                  ? Icons.notifications_rounded
+                  : Icons.notifications_none_rounded,
+              color: Colors.white,
+            ),
           ),
           const SizedBox(width: 8),
         ],

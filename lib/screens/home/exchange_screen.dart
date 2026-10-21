@@ -14,60 +14,41 @@ import '../../models/subscription_model.dart';
 import '../../repositories/subscription_repository.dart';
 import '../../models/exchange_candidate_model.dart';
 import '../../widgets/exchange_candidate_bottom_sheet.dart';
+import 'create_card_screen.dart';
 
 class ExchangeScreen extends StatefulWidget {
   const ExchangeScreen({super.key});
 
   @override
-  State<ExchangeScreen> createState() =>
-      _ExchangeScreenState();
+  State<ExchangeScreen> createState() => _ExchangeScreenState();
 }
 
-class _ExchangeScreenState
-    extends State<ExchangeScreen> {
-
+class _ExchangeScreenState extends State<ExchangeScreen> {
   bool isLoading = true;
-
   List<CardModel> cards = [];
-
   CardModel? selectedCard;
-
   bool _isQrDialogOpen = false;
-
   bool _sending = false;
 
-  final CardRepository _repository =
-  CardRepository();
-
-
-  final ExchangeApiRepository _exchangeApiRepository =
-  ExchangeApiRepository();
-
-  final SubscriptionRepository _subscriptionRepository =
-  SubscriptionRepository();
+  final CardRepository _repository = CardRepository();
+  final ExchangeApiRepository _exchangeApiRepository = ExchangeApiRepository();
+  final SubscriptionRepository _subscriptionRepository = SubscriptionRepository();
 
   SubscriptionModel? _subscription;
-
   List<ExchangeCandidateModel> _candidates = [];
-
   bool _loadingCandidates = false;
-
   Timer? _candidatePollingTimer;
 
   bool get _canExchange {
     if (_subscription == null) {
       return false;
     }
-
     return _subscription!.remainingContacts == null ||
         _subscription!.remainingContacts! > 0;
   }
 
   StreamSubscription<AccelerometerEvent>? _accelerometerSubscription;
-
-  DateTime _lastShakeTime =
-  DateTime.fromMillisecondsSinceEpoch(0);
-
+  DateTime _lastShakeTime = DateTime.fromMillisecondsSinceEpoch(0);
 
   @override
   void initState() {
@@ -77,27 +58,47 @@ class _ExchangeScreenState
     _startAccelerometerListener();
   }
 
-  Future<void> loadCards() async {
-    cards = await _repository.getMyCards();
-
-    if (cards.isNotEmpty) {
-      selectedCard = cards.first;
+  // Завантаження карток користувача
+  Future<void> loadCards({bool showLoading = true}) async {
+    if (showLoading && cards.isEmpty) {
+      setState(() {
+        isLoading = true;
+      });
     }
 
-    if (!mounted) return;
+    try {
+      final myCards = await _repository.getMyCards();
 
-    setState(() {
-      isLoading = false;
-    });
+      if (!mounted) return;
+
+      setState(() {
+        cards = myCards;
+
+        // Перевіряємо та вибираємо візитку
+        if (cards.isNotEmpty) {
+          if (selectedCard == null || !cards.any((c) => c.id == selectedCard!.id)) {
+            selectedCard = cards.first;
+          } else {
+            selectedCard = cards.firstWhere((c) => c.id == selectedCard!.id);
+          }
+        } else {
+          selectedCard = null;
+        }
+        isLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        isLoading = false;
+      });
+    }
   }
 
   bool _candidatesAreEqual(
       List<ExchangeCandidateModel> first,
       List<ExchangeCandidateModel> second,
       ) {
-    if (first.length != second.length) {
-      return false;
-    }
+    if (first.length != second.length) return false;
 
     for (int i = 0; i < first.length; i++) {
       if (first[i].userId != second[i].userId ||
@@ -106,64 +107,27 @@ class _ExchangeScreenState
         return false;
       }
     }
-
     return true;
   }
 
   Future<void> _loadCandidates() async {
-    if (_loadingCandidates) {
-      return;
-    }
+    if (_loadingCandidates) return;
 
     setState(() {
       _loadingCandidates = true;
     });
 
     try {
-      final candidates =
-      await _exchangeApiRepository.getCandidates();
+      final candidates = await _exchangeApiRepository.getCandidates();
+      if (!mounted) return;
 
-      if (!mounted) {
-        return;
-      }
-
-      print(
-        'EXCHANGE CANDIDATES: FOUND ${candidates.length}',
-      );
-
-      for (final candidate in candidates) {
-        print(
-          'Candidate: '
-              '${candidate.userId}, '
-              'cardId=${candidate.cardId}, '
-              'distance=${candidate.distance}m',
-        );
-      }
-
-      if (!_candidatesAreEqual(
-        _candidates,
-        candidates,
-      )) {
+      if (!_candidatesAreEqual(_candidates, candidates)) {
         setState(() {
           _candidates = candidates;
         });
       }
     } catch (e) {
-      print(
-        'EXCHANGE CANDIDATES ERROR: $e',
-      );
-
-      if (!mounted) {
-        return;
-      }
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Не вдалося знайти людей поруч: $e',
-          ),
-        ),
-      );
+      if (!mounted) return;
     } finally {
       if (mounted) {
         setState(() {
@@ -175,7 +139,6 @@ class _ExchangeScreenState
 
   void _startCandidatePolling() {
     _candidatePollingTimer?.cancel();
-
     _candidatePollingTimer = Timer.periodic(
       const Duration(seconds: 1),
           (timer) async {
@@ -183,91 +146,46 @@ class _ExchangeScreenState
           timer.cancel();
           return;
         }
-
-        if (_loadingCandidates) {
-          return;
-        }
-
+        if (_loadingCandidates) return;
         await _loadCandidates();
       },
     );
 
-    Future.delayed(
-      const Duration(seconds: 10),
-          () {
-        if (!mounted) {
-          return;
-        }
-
-        _candidatePollingTimer?.cancel();
-        _candidatePollingTimer = null;
-
-        print(
-          'EXCHANGE CANDIDATES: POLLING STOPPED',
-        );
-      },
-    );
+    Future.delayed(const Duration(seconds: 10), () {
+      if (!mounted) return;
+      _candidatePollingTimer?.cancel();
+      _candidatePollingTimer = null;
+    });
   }
 
   Future<void> _loadSubscription() async {
     try {
-      final subscription =
-      await _subscriptionRepository.getSubscriptionModel();
-
+      final subscription = await _subscriptionRepository.getSubscriptionModel();
       if (!mounted) return;
-
-      print(
-        'Subscription: '
-            'plan=${subscription.plan}, '
-            'created=${subscription.contactsCreated}, '
-            'remaining=${subscription.remainingContacts}',
-      );
 
       setState(() {
         _subscription = subscription;
       });
     } catch (e) {
       if (!mounted) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Не вдалося отримати стан підписки',
-          ),
-        ),
-      );
     }
   }
 
   Future<void> _showCandidatePicker() async {
-    if (!mounted) {
-      return;
-    }
+    if (!mounted) return;
 
     await showModalBottomSheet(
       context: context,
       backgroundColor: Colors.white,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(
-          top: Radius.circular(24),
-        ),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       builder: (_) {
         return ExchangeCandidateBottomSheet(
           initialCandidates: _candidates,
           onSelected: (candidate) {
             Navigator.of(context).pop();
-
-            print(
-              'EXCHANGE CANDIDATE SELECTED: '
-                  '${candidate.userId}, '
-                  'cardId=${candidate.cardId}, '
-                  'distance=${candidate.distance}m',
-            );
-
-            // Наступним кроком:
-            // відправлення selection на backend.
           },
         );
       },
@@ -275,28 +193,19 @@ class _ExchangeScreenState
   }
 
   void _startAccelerometerListener() {
-    _accelerometerSubscription =
-        accelerometerEventStream().listen((event) {
+    _accelerometerSubscription = accelerometerEventStream().listen((event) {
+      final now = DateTime.now();
+      if (now.difference(_lastShakeTime).inSeconds < 2) return;
 
-          final now = DateTime.now();
-
-          // Захист від багаторазового спрацювання
-          if (now.difference(_lastShakeTime).inSeconds < 2) {
-            return;
-          }
-
-          const double threshold = 18;
-
-          if (event.x.abs() > threshold) {
-            _lastShakeTime = now;
-
-            _startExchange();
-          }
-        });
+      const double threshold = 18;
+      if (event.x.abs() > threshold) {
+        _lastShakeTime = now;
+        _startExchange();
+      }
+    });
   }
 
   void _onExchangeSuccess() {
-
     if (!mounted) return;
 
     if (_isQrDialogOpen) {
@@ -307,43 +216,28 @@ class _ExchangeScreenState
     Navigator.pushAndRemoveUntil(
       context,
       MaterialPageRoute(
-        builder: (_) => const HomeScreen(
-          initialIndex: 3,
-        ),
+        builder: (_) => const HomeScreen(initialIndex: 3),
       ),
           (_) => false,
     );
   }
 
   Future<void> _showQrDialog(CardModel card) async {
-
     _isQrDialogOpen = true;
-
-    NotificationService.instance.addExchangeListener(
-      _onExchangeSuccess,
-    );
+    NotificationService.instance.addExchangeListener(_onExchangeSuccess);
 
     await showDialog(
       context: context,
       barrierDismissible: true,
-      builder: (_) => QrDialog(
-        card: card,
-      ),
+      builder: (_) => QrDialog(card: card),
     );
 
-    NotificationService.instance.removeExchangeListener(
-      _onExchangeSuccess,
-    );
-
+    NotificationService.instance.removeExchangeListener(_onExchangeSuccess);
     _isQrDialogOpen = false;
   }
 
   Future<void> _startExchange() async {
-    if (selectedCard == null ||
-        _sending ||
-        !_canExchange) {
-      return;
-    }
+    if (selectedCard == null || _sending || !_canExchange) return;
 
     _candidatePollingTimer?.cancel();
     _candidatePollingTimer = null;
@@ -353,34 +247,16 @@ class _ExchangeScreenState
     });
 
     try {
-      // 1. Створюємо власну waiting-заявку.
-      await _exchangeApiRepository.sendExchange(
-        cardId: selectedCard!.id,
-      );
-
-      // 2. Після цього шукаємо інших
-      //    користувачів, які теж очікують обмін.
+      await _exchangeApiRepository.sendExchange(cardId: selectedCard!.id);
       await _loadCandidates();
-
       _startCandidatePolling();
 
-      if (!mounted) {
-        return;
-      }
-
+      if (!mounted) return;
       await _showCandidatePicker();
-
     } catch (e) {
-      if (!mounted) {
-        return;
-      }
-
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            e.toString(),
-          ),
-        ),
+        SnackBar(content: Text(e.toString())),
       );
     } finally {
       if (mounted) {
@@ -396,9 +272,7 @@ class _ExchangeScreenState
       context: context,
       backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(
-          top: Radius.circular(24),
-        ),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       builder: (_) => CardPickerBottomSheet(
         cards: cards,
@@ -421,9 +295,64 @@ class _ExchangeScreenState
 
   @override
   Widget build(BuildContext context) {
+    // Гарантуємо фонове оновлення візиток при кожному відображенні цього екрана
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && !isLoading) {
+        loadCards(showLoading: false);
+      }
+    });
+
     if (isLoading) {
       return const Center(
         child: CircularProgressIndicator(),
+      );
+    }
+
+    // Якщо у користувача немає жодної візитки
+    if (cards.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(
+                Icons.badge_outlined,
+                size: 70,
+                color: Color(0xFFF59E0B),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Спочатку створіть візитку',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Щоб здійснювати обмін, вам потрібна хоча б одна створена візитка.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.grey),
+              ),
+              const SizedBox(height: 20),
+              ElevatedButton(
+                onPressed: () async {
+                  await Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const CreateCardScreen()),
+                  );
+                  loadCards();
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFF59E0B),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
+                child: const Text('Створити візитку'),
+              ),
+            ],
+          ),
+        ),
       );
     }
 
@@ -443,7 +372,6 @@ class _ExchangeScreenState
                   fontWeight: FontWeight.bold,
                 ),
               ),
-
               Row(
                 children: [
                   IconButton(
@@ -457,7 +385,6 @@ class _ExchangeScreenState
                       }
                     },
                   ),
-
                   IconButton(
                     icon: Icon(
                       Icons.qr_code_scanner,
@@ -469,7 +396,6 @@ class _ExchangeScreenState
                         ? null
                         : () {
                       if (selectedCard == null) return;
-
                       Navigator.push(
                         context,
                         MaterialPageRoute(
@@ -543,9 +469,7 @@ class _ExchangeScreenState
               width: 180,
               height: 48,
               child: ElevatedButton.icon(
-                onPressed: _sending || !_canExchange
-                    ? null
-                    : _startExchange,
+                onPressed: _sending || !_canExchange ? null : _startExchange,
                 icon: const Icon(Icons.bolt),
                 label: const Text('Почати обмін'),
                 style: ElevatedButton.styleFrom(
@@ -572,25 +496,24 @@ class _ExchangeScreenState
                   fontWeight: FontWeight.w600,
                 ),
               ),
-
-        if (cards.length > 1)
-    TextButton(
-      onPressed: _showCardPicker,
-      child: const Text(
-        'Обрати',
-        style: TextStyle(
-          color: Color(0xFFF59E0B),
-        ),
-      ),
-    ),
+              if (cards.length > 1)
+                TextButton(
+                  onPressed: _showCardPicker,
+                  child: const Text(
+                    'Обрати',
+                    style: TextStyle(
+                      color: Color(0xFFF59E0B),
+                    ),
+                  ),
+                ),
             ],
           ),
 
           const SizedBox(height: 12),
-        if (selectedCard != null)
+          if (selectedCard != null)
             CatalogCardWidget(
               card: selectedCard!,
-        ),
+            ),
         ],
       ),
     );

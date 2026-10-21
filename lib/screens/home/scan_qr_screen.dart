@@ -254,8 +254,9 @@ class ScannerOverlayPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
+    // Встановлюємо суцільний білий колір для всього екрана
     final paint = Paint()
-      ..color = Colors.black.withOpacity(0.5)
+      ..color = Colors.white
       ..style = PaintingStyle.fill;
 
     final screenRect = Rect.fromLTWH(
@@ -274,12 +275,13 @@ class ScannerOverlayPainter extends CustomPainter {
       height: frameSize,
     );
 
+    // Створюємо виріз (отвір) за допомогою PathFillType.evenOdd
     final path = Path()
       ..addRect(screenRect)
       ..addRRect(
         RRect.fromRectAndRadius(
           holeRect,
-          const Radius.circular(28),
+          const Radius.circular(28), // Закруглення кутів квадрта
         ),
       )
       ..fillType = PathFillType.evenOdd;

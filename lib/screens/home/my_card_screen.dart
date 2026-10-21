@@ -18,12 +18,13 @@ class _MyCardScreenState extends State<MyCardScreen> {
   List<CardModel> cards = [];
   bool isLoading = true;
   bool hasError = false;
+  bool _isFetching = false;
   String errorMessage = '';
   int cardLimit = 2;
 
   final CardRepository _repository = CardRepository();
   final SubscriptionRepository _subscriptionRepository =
-      SubscriptionRepository();
+  SubscriptionRepository();
 
   @override
   void initState() {
@@ -31,18 +32,22 @@ class _MyCardScreenState extends State<MyCardScreen> {
     loadCards();
   }
 
-  Future<void> loadCards() async {
-    setState(() {
-      isLoading = true;
-      hasError = false;
-    });
+  Future<void> loadCards({bool showLoading = true}) async {
+    if (_isFetching) return;
+    _isFetching = true;
+
+    if (showLoading && cards.isEmpty) {
+      setState(() {
+        isLoading = true;
+        hasError = false;
+      });
+    }
 
     try {
       final result = await _repository.getMyCards();
       final subscription = await _subscriptionRepository.getMySubscription();
 
       final limits = Map<String, dynamic>.from(subscription['limits'] ?? {});
-
       final backendCardLimit = (limits['cards'] as num?)?.toInt() ?? 2;
 
       if (!mounted) return;
@@ -51,6 +56,7 @@ class _MyCardScreenState extends State<MyCardScreen> {
         cards = result;
         cardLimit = backendCardLimit;
         isLoading = false;
+        hasError = false;
       });
     } catch (e) {
       if (!mounted) return;
@@ -58,9 +64,13 @@ class _MyCardScreenState extends State<MyCardScreen> {
       final msg = e.toString().replaceAll('Exception: ', '');
       setState(() {
         isLoading = false;
-        hasError = true;
-        errorMessage = msg;
+        if (cards.isEmpty) {
+          hasError = true;
+          errorMessage = msg;
+        }
       });
+    } finally {
+      _isFetching = false;
     }
   }
 
@@ -169,14 +179,18 @@ class _MyCardScreenState extends State<MyCardScreen> {
 
     if (confirm != true) return;
 
+    // Одразу прибираємо з UI
     setState(() {
       cards.removeAt(index);
     });
 
     try {
       await _repository.deleteCard(cardId);
+      // Оновлюємо стан після успішного видалення на бекенді
+      await loadCards(showLoading: false);
     } catch (e) {
       if (!mounted) return;
+      // У разі помилки повертаємо картку назад
       setState(() {
         cards.insert(index, card);
       });
@@ -190,7 +204,6 @@ class _MyCardScreenState extends State<MyCardScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
               color: const Color(0xFFEF4444),
-              // Приємний червоний (Tailwind Red 500)
               borderRadius: BorderRadius.circular(16),
               boxShadow: [
                 BoxShadow(
@@ -228,15 +241,22 @@ class _MyCardScreenState extends State<MyCardScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xfff8fafc),
-      body: isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : hasError
-          ? _buildErrorState()
-          : cards.isEmpty
-          ? _buildEmptyState(context)
-          : _buildCardsView(),
+    return FocusScope(
+      onFocusChange: (focused) {
+        if (focused) {
+          loadCards(showLoading: false);
+        }
+      },
+      child: Scaffold(
+        backgroundColor: const Color(0xfff8fafc),
+        body: isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : hasError
+            ? _buildErrorState()
+            : cards.isEmpty
+            ? _buildEmptyState(context)
+            : _buildCardsView(),
+      ),
     );
   }
 
@@ -258,7 +278,7 @@ class _MyCardScreenState extends State<MyCardScreen> {
             ),
             const SizedBox(height: 20),
             ElevatedButton.icon(
-              onPressed: loadCards,
+              onPressed: () => loadCards(),
               icon: const Icon(Icons.refresh_rounded),
               label: const Text("Спробувати знову"),
               style: ElevatedButton.styleFrom(
@@ -335,14 +355,11 @@ class _MyCardScreenState extends State<MyCardScreen> {
       height: 56,
       child: ElevatedButton(
         onPressed: () async {
-          final result = await Navigator.push<bool>(
+          await Navigator.push(
             context,
             MaterialPageRoute(builder: (_) => const CreateCardScreen()),
           );
-
-          if (result == true) {
-            loadCards();
-          }
+          loadCards();
         },
         style: ElevatedButton.styleFrom(
           backgroundColor: const Color(0xFFF59E0B),
@@ -364,14 +381,11 @@ class _MyCardScreenState extends State<MyCardScreen> {
       height: 44,
       child: ElevatedButton(
         onPressed: () async {
-          final result = await Navigator.push<bool>(
+          await Navigator.push(
             context,
             MaterialPageRoute(builder: (_) => const CreateCardScreen()),
           );
-
-          if (result == true) {
-            loadCards();
-          }
+          loadCards();
         },
         style: ElevatedButton.styleFrom(
           backgroundColor: Colors.white,
