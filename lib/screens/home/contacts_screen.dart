@@ -39,13 +39,11 @@ class _ContactsScreenState extends State<ContactsScreen> {
   }
 
   Future<void> _handleDeleteContact(ContactItem item) async {
-    // 1. Одразу прибираємо контакт із локального списку на екрані
     setState(() {
       _localContacts?.removeWhere((c) => c.contactCardId == item.contactCardId);
     });
 
     try {
-      // 2. Викликаємо видалення на бекенді
       await _contactRepository.deleteContact(item.contactCardId);
     } catch (e) {
       if (!mounted) return;

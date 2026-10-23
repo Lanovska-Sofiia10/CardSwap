@@ -24,7 +24,6 @@ class CatalogRequestsResponse {
     );
   }
 
-  /// Універсальний парсер Timestamp для використанная в ContactRequestModel
   static DateTime parseCreatedAt(dynamic value) {
     if (value is String) {
       return DateTime.tryParse(value) ?? DateTime.now();

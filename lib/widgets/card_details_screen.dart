@@ -31,7 +31,6 @@ class CardDetailsScreen extends StatefulWidget {
 class _CardDetailsScreenState extends State<CardDetailsScreen> {
   late ContactState currentState;
 
-  /// Перевірка чи належить візитка поточному авторизованому користувачу
   bool get isMyCard {
     final currentUserId = FirebaseAuth.instance.currentUser?.uid;
     return currentUserId != null && currentUserId == widget.card.ownerId;
@@ -69,7 +68,6 @@ class _CardDetailsScreenState extends State<CardDetailsScreen> {
             const SizedBox(height: 20),
             _buildAbout(cardColor),
             const SizedBox(height: 20),
-            // Власник картки завжди бачить свої контакти
             if (widget.canViewContacts || isMyCard)
               _buildContacts(cardColor)
             else
@@ -142,7 +140,6 @@ class _CardDetailsScreenState extends State<CardDetailsScreen> {
             ],
           ),
 
-          // Для власної картки кнопки запиту не відображаємо
           if (!isMyCard) ...[
             const SizedBox(height: 20),
             if (widget.showRequestActions)

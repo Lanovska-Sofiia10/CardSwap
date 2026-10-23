@@ -7,14 +7,12 @@ import 'backend_service.dart';
 
 class ApiService {
 
-  // Допоміжний метод для безпечного парсингу JSON
   static dynamic _parseResponse(http.Response response) {
     if (response.statusCode >= 200 && response.statusCode < 300) {
       if (response.body.isEmpty) return null;
       return jsonDecode(response.body);
     }
 
-    // Спроба розпарсити зрозумілу помилку з сервера
     try {
       final errorData = jsonDecode(response.body);
       final message = errorData['errors'] != null

@@ -1,5 +1,4 @@
 import 'dart:convert';
-
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:http/http.dart' as http;
 import '../models/exchange_candidate_model.dart';
@@ -18,28 +17,15 @@ class ExchangeApiRepository {
       throw Exception("User not authenticated.");
     }
 
-    final position =
-    LocationService.getBestAvailablePosition();
+    final position = LocationService.getBestAvailablePosition();
 
     if (position == null) {
-      print("EXCHANGE: NO LOCATION");
       throw Exception(
         "Current location is not available yet.",
       );
     }
 
-    print(
-      "EXCHANGE: SENDING LOCATION "
-          "lat=${position.latitude}, "
-          "lon=${position.longitude}, "
-          "accuracy=${position.accuracy}m",
-    );
-
     final idToken = await user.getIdToken();
-
-    print(
-      "EXCHANGE: POST ${BackendService.baseUrl}/exchange",
-    );
 
     final response = await http.post(
       Uri.parse("${BackendService.baseUrl}/exchange"),
@@ -53,12 +39,6 @@ class ExchangeApiRepository {
         "longitude": position.longitude,
         "accuracy": position.accuracy,
       }),
-    );
-
-    print(
-      "EXCHANGE: RESPONSE "
-          "status=${response.statusCode}, "
-          "body=${response.body}",
     );
 
     if (response.statusCode != 200) {
@@ -102,26 +82,15 @@ class ExchangeApiRepository {
       throw Exception("User not authenticated.");
     }
 
-    final position =
-    LocationService.getBestAvailablePosition();
+    final position = LocationService.getBestAvailablePosition();
 
     if (position == null) {
-      print("EXCHANGE CANDIDATES: NO LOCATION");
-
       throw Exception(
         "Current location is not available yet.",
       );
     }
 
-    print(
-      "EXCHANGE CANDIDATES: LOCATION "
-          "lat=${position.latitude}, "
-          "lon=${position.longitude}, "
-          "accuracy=${position.accuracy}m",
-    );
-
-    final idToken =
-    await user.getIdToken();
+    final idToken = await user.getIdToken();
 
     final uri = Uri.parse(
       "${BackendService.baseUrl}/exchange/candidates",
@@ -132,10 +101,6 @@ class ExchangeApiRepository {
       },
     );
 
-    print(
-      "EXCHANGE CANDIDATES: GET $uri",
-    );
-
     final response = await http.get(
       uri,
       headers: {
@@ -143,29 +108,18 @@ class ExchangeApiRepository {
       },
     );
 
-    print(
-      "EXCHANGE CANDIDATES: RESPONSE "
-          "status=${response.statusCode}, "
-          "body=${response.body}",
-    );
-
     if (response.statusCode != 200) {
       throw Exception(response.body);
     }
 
-    final data =
-    jsonDecode(response.body)
-    as Map<String, dynamic>;
-
-    final candidatesJson =
-        data['candidates'] as List<dynamic>? ?? [];
+    final data = jsonDecode(response.body) as Map<String, dynamic>;
+    final candidatesJson = data['candidates'] as List<dynamic>? ?? [];
 
     return candidatesJson
         .map(
-          (item) =>
-          ExchangeCandidateModel.fromJson(
-            item as Map<String, dynamic>,
-          ),
+          (item) => ExchangeCandidateModel.fromJson(
+        item as Map<String, dynamic>,
+      ),
     )
         .toList();
   }

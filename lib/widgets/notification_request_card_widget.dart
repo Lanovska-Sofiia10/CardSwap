@@ -38,7 +38,6 @@ class NotificationRequestCardWidget extends StatelessWidget {
             onTap: onOpen,
             child: Row(
               children: [
-                // Кольорова лінія
                 Container(
                   width: 6,
                   height: 82,
@@ -53,7 +52,6 @@ class NotificationRequestCardWidget extends StatelessWidget {
                     ),
                     child: Row(
                       children: [
-                        // Фото
                         ClipRRect(
                           borderRadius: BorderRadius.circular(12),
                           child: SizedBox(
@@ -77,7 +75,6 @@ class NotificationRequestCardWidget extends StatelessWidget {
 
                         const SizedBox(width: 12),
 
-                        // Інформація
                         Expanded(
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
@@ -126,7 +123,6 @@ class NotificationRequestCardWidget extends StatelessWidget {
 
                         const SizedBox(width: 10),
 
-                        // Кнопки
                         Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [

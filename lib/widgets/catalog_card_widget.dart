@@ -40,7 +40,6 @@ class CatalogCardWidget extends StatelessWidget {
           ),
           child: Stack(
             children: [
-              // Верхня смуга
               Positioned(
                 top: 0,
                 left: 0,
@@ -51,7 +50,6 @@ class CatalogCardWidget extends StatelessWidget {
                 ),
               ),
 
-              // Декоративний елемент справа
               Positioned(
                 top: 0,
                 right: 0,

@@ -18,7 +18,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final emailController = TextEditingController();
   final passwordController = TextEditingController();
   bool _obscurePassword = true;
-  bool _isPrivacyPolicyAccepted = false; // Стан для галочки
+  bool _isPrivacyPolicyAccepted = false;
   String? errorMessage;
 
   final AuthRepository repository = AuthRepository();
@@ -75,7 +75,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
       if (!mounted) return;
 
-      // Відкриваємо екран створення візитки
       final created = await Navigator.push<bool>(
         context,
         MaterialPageRoute(
@@ -85,7 +84,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
       if (!mounted) return;
 
-      // Після створення картки або закриття повністю очищаємо стек і відкриваємо HomeScreen
       Navigator.pushAndRemoveUntil(
         context,
         MaterialPageRoute(builder: (_) => const HomeScreen()),
@@ -123,12 +121,22 @@ class _RegisterScreenState extends State<RegisterScreen> {
     } catch (e) {
       if (!mounted) return;
 
-      final cleanError = e.toString().replaceAll('Exception: ', '');
+      final rawError = e.toString().toLowerCase();
+      String localizedError = 'Не вдалося створити акаунт. Спробуйте ще раз.';
+
+      if (rawError.contains('email already in use') ||
+          rawError.contains('already exists') ||
+          rawError.contains('user_exists') ||
+          rawError.contains('email_exists')) {
+        localizedError = 'Акаунт із цим Email вже існує';
+      } else if (rawError.contains('invalid email') || rawError.contains('invalid_email')) {
+        localizedError = 'Введіть коректний Email';
+      } else if (rawError.contains('weak password')) {
+        localizedError = 'Пароль занадто простий (мінімум 6 символів)';
+      }
 
       setState(() {
-        errorMessage = cleanError.isNotEmpty
-            ? cleanError
-            : 'Не вдалося створити акаунт. Спробуйте ще раз.';
+        errorMessage = localizedError;
       });
     } finally {
       if (mounted) {
@@ -270,7 +278,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
                       const SizedBox(height: 16),
 
-                      // Плашка з галочкою (Checkbox) та посиланням на Політику конфіденційності
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
@@ -343,7 +350,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         width: double.infinity,
                         height: 56,
                         child: ElevatedButton(
-                          // Кнопка заблокована (null), якщо йде завантаження або НЕ прийнята політика
                           onPressed: (isLoading || !_isPrivacyPolicyAccepted)
                               ? null
                               : register,

@@ -58,7 +58,6 @@ class AuthService {
 
   Future<void> logout() async {
     try {
-      // Видаляємо FCM токен користувача з бази перед виходом
       await NotificationService.instance.deleteCurrentToken();
     } catch (e) {
       debugPrint('Error deleting FCM token on logout: $e');

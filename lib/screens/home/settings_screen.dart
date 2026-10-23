@@ -148,7 +148,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            /// Обліковий запис
             const SettingsSection(title: "Обліковий запис"),
             _card(
               child: Column(
@@ -255,7 +254,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
             ),
 
-            /// Візитки
             const SettingsSection(title: "Візитки"),
             _card(
               child: Column(
@@ -305,7 +303,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
             ),
 
-            /// Інформація та Правова інформація
             const SettingsSection(title: "Інформація"),
             _card(
               child: Column(
@@ -333,7 +330,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 title: "Видалити акаунт",
                 isDestructive: true,
                   onTap: () async {
-                    // 1. Перше діалогове вікно — Підтвердження намірiв
                     final result = await showDialog<bool>(
                       context: context,
                       builder: (context) {
@@ -347,7 +343,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             child: Column(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                // Кругла іконка у червоному контексті
                                 Container(
                                   width: 70,
                                   height: 70,
@@ -435,7 +430,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
                     if (result != true || !mounted) return;
 
-                    // 2. Друге діалогове вікно — Введення пароля
                     final password = await showDialog<String>(
                       context: context,
                       builder: (context) {
@@ -565,7 +559,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
                     if (password == null || password.isEmpty || !mounted) return;
 
-                    // 3. Індикатор завантаження під час видалення
                     showDialog(
                       context: context,
                       barrierDismissible: false,
@@ -603,9 +596,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
                       if (!mounted) return;
 
-                      Navigator.pop(context); // закриваємо діалог завантаження
+                      Navigator.pop(context);
 
-                      // Переходимо на екран входу і очищаємо весь стек навігації
                       Navigator.pushAndRemoveUntil(
                         context,
                         MaterialPageRoute(builder: (_) => const LoginScreen()),

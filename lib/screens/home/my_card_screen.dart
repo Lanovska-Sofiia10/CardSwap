@@ -179,18 +179,15 @@ class _MyCardScreenState extends State<MyCardScreen> {
 
     if (confirm != true) return;
 
-    // Одразу прибираємо з UI
     setState(() {
       cards.removeAt(index);
     });
 
     try {
       await _repository.deleteCard(cardId);
-      // Оновлюємо стан після успішного видалення на бекенді
       await loadCards(showLoading: false);
     } catch (e) {
       if (!mounted) return;
-      // У разі помилки повертаємо картку назад
       setState(() {
         cards.insert(index, card);
       });

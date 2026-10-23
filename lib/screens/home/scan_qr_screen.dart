@@ -106,7 +106,6 @@ class _ScanQrScreenState extends State<ScanQrScreen> {
       final message = e.toString().replaceAll("Exception: ", "");
       _showErrorSnackBar(message);
 
-      // Пауза перед можливістю повторного сканування
       await Future.delayed(const Duration(seconds: 2));
       if (!mounted) return;
 
@@ -254,7 +253,6 @@ class ScannerOverlayPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    // Встановлюємо суцільний білий колір для всього екрана
     final paint = Paint()
       ..color = Colors.white
       ..style = PaintingStyle.fill;
@@ -275,13 +273,12 @@ class ScannerOverlayPainter extends CustomPainter {
       height: frameSize,
     );
 
-    // Створюємо виріз (отвір) за допомогою PathFillType.evenOdd
     final path = Path()
       ..addRect(screenRect)
       ..addRRect(
         RRect.fromRectAndRadius(
           holeRect,
-          const Radius.circular(28), // Закруглення кутів квадрта
+          const Radius.circular(28),
         ),
       )
       ..fillType = PathFillType.evenOdd;

@@ -60,7 +60,6 @@ class CatalogRepository {
       try {
         yield await loadCatalog();
       } catch (e) {
-        // Логуємо помилку стріму, щоб він не падав
         print("Error in catalogStream: $e");
       }
       await Future.delayed(const Duration(seconds: 3));
@@ -80,7 +79,6 @@ class CatalogRepository {
     );
   }
 
-  /// ✅ ВИПРАВЛЕНО: Бекенд очікує поле "toCardId"
   Future<void> cancelRequest(
       String targetCardId,
       ) async {

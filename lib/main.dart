@@ -30,7 +30,6 @@ Future<void> main() async {
   await NotificationService.instance.initialize();
   await LocationService.start();
 
-  // Додаємо безпечну обробку підписки та перевірку помилок
   FirebaseAuth.instance.authStateChanges().listen(
         (user) {
       if (user != null) {

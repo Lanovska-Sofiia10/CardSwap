@@ -78,7 +78,6 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     } catch (e) {
       if (!mounted) return;
 
-      // Якщо бекенд повернув власну помилку (наприклад, через Exception("..."))
       final cleanError = e.toString().replaceAll('Exception: ', '');
 
       setState(() {
@@ -192,7 +191,6 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                         ),
                       ),
 
-                      // Вивід помилки (червоний текст)
                       if (errorMessage != null) ...[
                         const SizedBox(height: 16),
                         Align(
@@ -207,7 +205,6 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                         ),
                       ],
 
-                      // Вивід успіху (зелений текст)
                       if (successMessage != null) ...[
                         const SizedBox(height: 16),
                         Align(

@@ -85,8 +85,6 @@ class NotificationService {
 
     debugPrint('Notification permission: ${settings.authorizationStatus}');
 
-    // Вимикаємо стандартні вспливаючі банери від iOS/Android, коли додаток відкрито,
-    // щоб самостійно контролювати їх через _localNotifications
     await FirebaseMessaging.instance.setForegroundNotificationPresentationOptions(
       alert: false,
       badge: true,
@@ -132,7 +130,6 @@ class NotificationService {
 
       final notification = message.notification;
 
-      // Показуємо баннер ЛЕШЕ коли додаток відкритий у користувача на екрані
       if (notification != null) {
         await _localNotifications.show(
           id: message.messageId.hashCode,

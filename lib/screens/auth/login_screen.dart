@@ -33,7 +33,6 @@ class _LoginScreenState extends State<LoginScreen> {
     final email = emailController.text.trim();
     final password = passwordController.text;
 
-    // Перевіряємо, чи заповнені поля
     if (email.isEmpty || password.isEmpty) {
       setState(() {
         errorMessage = 'Введіть Email та пароль';

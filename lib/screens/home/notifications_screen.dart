@@ -49,7 +49,6 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     try {
       await repository.acceptRequest(request);
       if (!mounted) return;
-      // Тихо оновлюємо список без показа тоастів
       _loadRequests();
     } catch (e) {
       if (!mounted) return;
@@ -61,7 +60,6 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     try {
       await repository.rejectRequest(request);
       if (!mounted) return;
-      // Тихо оновлюємо список без показа тоастів
       _loadRequests();
     } catch (e) {
       if (!mounted) return;

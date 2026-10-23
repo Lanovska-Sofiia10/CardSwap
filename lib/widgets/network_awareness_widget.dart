@@ -63,15 +63,13 @@ class _NetworkAwarenessWidgetState extends State<NetworkAwarenessWidget> {
   Widget build(BuildContext context) {
     return Stack(
       children: [
-        // Основний контент додатка (зберігає стан)
         widget.child,
 
-        // Модальне вікно поверх усього екрана, якщо немає інтернету
         if (!_isConnected)
           PopScope(
-            canPop: false, // Блокує кнопку "Назад" на Android
+            canPop: false,
             child: Container(
-              color: Colors.black54, // Затемнення фону
+              color: Colors.black54,
               alignment: Alignment.center,
               padding: const EdgeInsets.all(24),
               child: Material(

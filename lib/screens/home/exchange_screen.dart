@@ -58,7 +58,6 @@ class _ExchangeScreenState extends State<ExchangeScreen> {
     _startAccelerometerListener();
   }
 
-  // Завантаження карток користувача
   Future<void> loadCards({bool showLoading = true}) async {
     if (showLoading && cards.isEmpty) {
       setState(() {
@@ -74,7 +73,6 @@ class _ExchangeScreenState extends State<ExchangeScreen> {
       setState(() {
         cards = myCards;
 
-        // Перевіряємо та вибираємо візитку
         if (cards.isNotEmpty) {
           if (selectedCard == null || !cards.any((c) => c.id == selectedCard!.id)) {
             selectedCard = cards.first;
@@ -119,9 +117,8 @@ class _ExchangeScreenState extends State<ExchangeScreen> {
 
     try {
       final candidates = await _exchangeApiRepository.getCandidates();
-      if (!mounted) return;
-
       if (!_candidatesAreEqual(_candidates, candidates)) {
+        if (!mounted) return;
         setState(() {
           _candidates = candidates;
         });
@@ -295,7 +292,6 @@ class _ExchangeScreenState extends State<ExchangeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Гарантуємо фонове оновлення візиток при кожному відображенні цього екрана
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted && !isLoading) {
         loadCards(showLoading: false);
@@ -308,10 +304,9 @@ class _ExchangeScreenState extends State<ExchangeScreen> {
       );
     }
 
-    // Якщо у користувача немає жодної візитки
     if (cards.isEmpty) {
       return Center(
-        child: Padding(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -356,166 +351,185 @@ class _ExchangeScreenState extends State<ExchangeScreen> {
       );
     }
 
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Header
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text(
-                'Обмін',
-                style: TextStyle(
-                  fontSize: 30,
-                  fontWeight: FontWeight.bold,
-                ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return SafeArea(
+          child: SingleChildScrollView(
+            physics: const BouncingScrollPhysics(),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                minHeight: constraints.maxHeight,
               ),
-              Row(
-                children: [
-                  IconButton(
-                    icon: const Icon(
-                      Icons.qr_code,
-                      color: Color(0xFFF59E0B),
-                    ),
-                    onPressed: () {
-                      if (selectedCard != null) {
-                        _showQrDialog(selectedCard!);
-                      }
-                    },
-                  ),
-                  IconButton(
-                    icon: Icon(
-                      Icons.qr_code_scanner,
-                      color: _canExchange
-                          ? const Color(0xFFF59E0B)
-                          : Colors.grey,
-                    ),
-                    onPressed: !_canExchange
-                        ? null
-                        : () {
-                      if (selectedCard == null) return;
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => ScanQrScreen(
-                            myCardId: selectedCard!.id,
+              child: IntrinsicHeight(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            'Обмін',
+                            style: TextStyle(
+                              fontSize: 30,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          Row(
+                            children: [
+                              IconButton(
+                                icon: const Icon(
+                                  Icons.qr_code,
+                                  color: Color(0xFFF59E0B),
+                                ),
+                                onPressed: () {
+                                  if (selectedCard != null) {
+                                    _showQrDialog(selectedCard!);
+                                  }
+                                },
+                              ),
+                              IconButton(
+                                icon: Icon(
+                                  Icons.qr_code_scanner,
+                                  color: _canExchange
+                                      ? const Color(0xFFF59E0B)
+                                      : Colors.grey,
+                                ),
+                                onPressed: !_canExchange
+                                    ? null
+                                    : () {
+                                  if (selectedCard == null) return;
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => ScanQrScreen(
+                                        myCardId: selectedCard!.id,
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+
+                      const Spacer(),
+
+                      Center(
+                        child: Container(
+                          width: 90,
+                          height: 90,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF59E0B),
+                            borderRadius: BorderRadius.circular(22),
+                            boxShadow: const [
+                              BoxShadow(
+                                color: Color(0x33F59E0B),
+                                blurRadius: 20,
+                                spreadRadius: 3,
+                              ),
+                            ],
+                          ),
+                          child: const Icon(
+                            Icons.bolt,
+                            color: Colors.white,
+                            size: 42,
                           ),
                         ),
-                      );
-                    },
-                  ),
-                ],
-              ),
-            ],
-          ),
+                      ),
 
-          const SizedBox(height: 50),
+                      const SizedBox(height: 20),
 
-          // Icon
-          Center(
-            child: Container(
-              width: 90,
-              height: 90,
-              decoration: BoxDecoration(
-                color: const Color(0xFFF59E0B),
-                borderRadius: BorderRadius.circular(22),
-                boxShadow: const [
-                  BoxShadow(
-                    color: Color(0x33F59E0B),
-                    blurRadius: 20,
-                    spreadRadius: 3,
-                  ),
-                ],
-              ),
-              child: const Icon(
-                Icons.bolt,
-                color: Colors.white,
-                size: 42,
-              ),
-            ),
-          ),
+                      const Center(
+                        child: Text(
+                          'Готовий до обміну',
+                          style: TextStyle(
+                            fontSize: 26,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
 
-          const SizedBox(height: 28),
+                      const SizedBox(height: 8),
 
-          const Center(
-            child: Text(
-              'Готовий до обміну',
-              style: TextStyle(
-                fontSize: 28,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
+                      const Center(
+                        child: Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 16),
+                          child: Text(
+                            'Потрясіть телефон або натисніть кнопку нижче, щоб обмінятись',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: Colors.grey,
+                              fontSize: 15,
+                            ),
+                          ),
+                        ),
+                      ),
 
-          const SizedBox(height: 12),
+                      const SizedBox(height: 20),
 
-          const Center(
-            child: Text(
-              'Потрясіть телефон або свайпніть,\nщоб обмінятись',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: Colors.grey,
-                fontSize: 16,
-              ),
-            ),
-          ),
+                      Center(
+                        child: SizedBox(
+                          width: 180,
+                          height: 48,
+                          child: ElevatedButton.icon(
+                            onPressed: _sending || !_canExchange
+                                ? null
+                                : _startExchange,
+                            icon: const Icon(Icons.bolt),
+                            label: const Text('Почати обмін'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFFF59E0B),
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
 
-          const SizedBox(height: 28),
+                      const Spacer(),
 
-          Center(
-            child: SizedBox(
-              width: 180,
-              height: 48,
-              child: ElevatedButton.icon(
-                onPressed: _sending || !_canExchange ? null : _startExchange,
-                icon: const Icon(Icons.bolt),
-                label: const Text('Почати обмін'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFF59E0B),
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                ),
-              ),
-            ),
-          ),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            'Моя візитка',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          if (cards.length > 1)
+                            TextButton(
+                              onPressed: _showCardPicker,
+                              child: const Text(
+                                'Обрати',
+                                style: TextStyle(
+                                  color: Color(0xFFF59E0B),
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
 
-          const Spacer(),
+                      const SizedBox(height: 8),
 
-          // My Card Header
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text(
-                'Моя візитка',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              if (cards.length > 1)
-                TextButton(
-                  onPressed: _showCardPicker,
-                  child: const Text(
-                    'Обрати',
-                    style: TextStyle(
-                      color: Color(0xFFF59E0B),
-                    ),
+                      if (selectedCard != null)
+                        CatalogCardWidget(
+                          card: selectedCard!,
+                        ),
+                    ],
                   ),
                 ),
-            ],
-          ),
-
-          const SizedBox(height: 12),
-          if (selectedCard != null)
-            CatalogCardWidget(
-              card: selectedCard!,
+              ),
             ),
-        ],
-      ),
+          ),
+        );
+      },
     );
   }
 }

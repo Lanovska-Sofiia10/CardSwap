@@ -5,7 +5,6 @@ class SubscriptionRepository {
   Future<Map<String, dynamic>> getMySubscription() async {
     final response = await ApiService.get('/subscription/me');
 
-    // Якщо бекенд повертає { success: true, data: { ... } }
     if (response is Map<String, dynamic> && response['data'] != null) {
       return Map<String, dynamic>.from(response['data']);
     }

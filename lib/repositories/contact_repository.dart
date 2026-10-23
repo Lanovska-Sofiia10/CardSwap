@@ -23,7 +23,6 @@ class ContactRepository {
     BaseOptions(baseUrl: BackendService.baseUrl),
   );
 
-  /// Отримання списку контактів через REST API
   Future<List<ContactItem>> getContacts() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return [];
@@ -59,7 +58,6 @@ class ContactRepository {
     }
   }
 
-  /// Періодичний Stream для безпечного оновлення списку через бекенд
   Stream<List<ContactItem>> contactsStream() async* {
     while (true) {
       try {
@@ -70,7 +68,6 @@ class ContactRepository {
     }
   }
 
-  /// Видалення контакту через API
   Future<void> deleteContact(String contactCardId) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) throw Exception("Користувач не авторизований");
